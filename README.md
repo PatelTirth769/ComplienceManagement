@@ -6,7 +6,7 @@ A full-stack compliance management system featuring dynamic vendor audit checkli
 
 ---
 
-## 🏗️ Project Architecture
+## 🏗️ Project Architecture..
 
 ```
 Complience_Calculator/
