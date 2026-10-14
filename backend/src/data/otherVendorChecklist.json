@@ -1,0 +1,354 @@
+[
+  {
+    "id": "OTHER-001",
+    "serialNumber": 1,
+    "title": "Contract Labour Licence / Application",
+    "type": "CL Act",
+    "particulars": "Copy of Contract Labour Licence or Application along with security deposit details in Form IV",
+    "statutoryRequirement": "Copy of Contract Labour Licence or Application along with security deposit details in Form IV"
+  },
+  {
+    "id": "OTHER-002",
+    "serialNumber": 2,
+    "title": "Commencement / completion of Contract",
+    "type": "CL Act",
+    "particulars": "Copy of commencement / completion of contract in Form VI-A",
+    "statutoryRequirement": "Copy of commencement / completion of contract in Form VI-A"
+  },
+  {
+    "id": "OTHER-003",
+    "serialNumber": 3,
+    "title": "Service Certificate",
+    "type": "CL Act",
+    "particulars": "Service certificate issued to employee by contractor on the termination of employment",
+    "statutoryRequirement": "Service certificate issued to employee by contractor on the termination of employment"
+  },
+  {
+    "id": "OTHER-004",
+    "serialNumber": 4,
+    "title": "Employment Cards",
+    "type": "CL Act",
+    "particulars": "Employment card (Form X / XIV) issued to each worker by contractor within 3 days of the employment of the worker enlisting particulars of worker.",
+    "statutoryRequirement": "Employment card (Form X / XIV) issued to each worker by contractor within 3 days of the employment of the worker enlisting particulars of worker."
+  },
+  {
+    "id": "OTHER-005",
+    "serialNumber": 5,
+    "title": "Register of Workmen",
+    "type": "CL Act",
+    "particulars": "Register of Workmen in Form XIII which contains details of Contractor, Principal Employer & Contract Employees.",
+    "statutoryRequirement": "Register of Workmen in Form XIII which contains details of Contractor, Principal Employer & Contract Employees."
+  },
+  {
+    "id": "OTHER-006",
+    "serialNumber": 6,
+    "title": "Attendance / Muster Roll",
+    "type": "CL Act",
+    "particulars": "Maintained by contractor giving details about employee's attendance viz. present / absent days / leave /holiday status",
+    "statutoryRequirement": "Maintained by contractor giving details about employee's attendance viz. present / absent days / leave /holiday status"
+  },
+  {
+    "id": "OTHER-007",
+    "serialNumber": 7,
+    "title": "Register of Wages",
+    "type": "CL Act / MW Act",
+    "particulars": "Wage register in prescribed format displaying details of wages",
+    "statutoryRequirement": "Wage register in prescribed format displaying details of wages"
+  },
+  {
+    "id": "OTHER-008",
+    "serialNumber": 8,
+    "title": "Register of Deductions",
+    "type": "CL Act",
+    "particulars": "Register of Deduction showing details of deductions made from wages",
+    "statutoryRequirement": "Register of Deduction showing details of deductions made from wages"
+  },
+  {
+    "id": "OTHER-009",
+    "serialNumber": 9,
+    "title": "Register of Fines",
+    "type": "CL Act",
+    "particulars": "Register of Fines for details of any Fines imposed.",
+    "statutoryRequirement": "Register of Fines for details of any Fines imposed."
+  },
+  {
+    "id": "OTHER-010",
+    "serialNumber": 10,
+    "title": "Register of Advances",
+    "type": "CL Act",
+    "particulars": "Register of Advances depicting details of Advances taken.",
+    "statutoryRequirement": "Register of Advances depicting details of Advances taken."
+  },
+  {
+    "id": "OTHER-011",
+    "serialNumber": 11,
+    "title": "Register of Overtime",
+    "type": "CL Act",
+    "particulars": "Register of Overtime maintained for any overtime done and display overtime hours.",
+    "statutoryRequirement": "Register of Overtime maintained for any overtime done and display overtime hours."
+  },
+  {
+    "id": "OTHER-012",
+    "serialNumber": 12,
+    "title": "Wage slips",
+    "type": "CL Act",
+    "particulars": "Sample copies of Payslips in the prescribed format",
+    "statutoryRequirement": "Sample copies of Payslips in the prescribed format"
+  },
+  {
+    "id": "OTHER-013",
+    "serialNumber": 13,
+    "title": "Overtime Limit",
+    "type": "CL Act",
+    "particulars": "Overtime not to exceed as mentioned in the Act",
+    "statutoryRequirement": "Overtime not to exceed as mentioned in the Act"
+  },
+  {
+    "id": "OTHER-014",
+    "serialNumber": 14,
+    "title": "Overtime Rate",
+    "type": "CL Act",
+    "particulars": "Overtime paid double the rate of gross wages",
+    "statutoryRequirement": "Overtime paid double the rate of gross wages"
+  },
+  {
+    "id": "OTHER-015",
+    "serialNumber": 15,
+    "title": "No. of employees on site",
+    "type": "CL Act",
+    "particulars": "Employees working on site are lesser or equal to the number mentioned in License",
+    "statutoryRequirement": "Employees working on site are lesser or equal to the number mentioned in License"
+  },
+  {
+    "id": "OTHER-016",
+    "serialNumber": 16,
+    "title": "Contract Labour Returns",
+    "type": "CL Act",
+    "particulars": "Half yearly returns filed in Form XXIV (in duplicate) by contractor not later than 30 days from the close of the half year.",
+    "statutoryRequirement": "Half yearly returns filed in Form XXIV (in duplicate) by contractor not later than 30 days from the close of the half year."
+  },
+  {
+    "id": "OTHER-017",
+    "serialNumber": 17,
+    "title": "Principal Employer Attestation on Muster roll and Salary Register",
+    "type": "CL Act",
+    "particulars": "Has the Principal Employer certified the disbursement of wages done to the contract employees as per Contract Labour rules against each entry",
+    "statutoryRequirement": "Has the Principal Employer certified the disbursement of wages done to the contract employees as per Contract Labour rules against each entry"
+  },
+  {
+    "id": "OTHER-018",
+    "serialNumber": 18,
+    "title": "ESI Registration Code",
+    "type": "ESI Act",
+    "particulars": "Proof of having ESI registration",
+    "statutoryRequirement": "Proof of having ESI registration"
+  },
+  {
+    "id": "OTHER-019",
+    "serialNumber": 19,
+    "title": "ESIC online monthly register",
+    "type": "ESI Act",
+    "particulars": "ESIC online monthly register in PDF format with employees details working on site during the month with contribution verification on random basis",
+    "statutoryRequirement": "ESIC online monthly register in PDF format with employees details working on site during the month with contribution verification on random basis"
+  },
+  {
+    "id": "OTHER-020",
+    "serialNumber": 20,
+    "title": "ESI challan / SBI Token",
+    "type": "ESI Act",
+    "particulars": "ESI challan for current month",
+    "statutoryRequirement": "ESI challan for current month"
+  },
+  {
+    "id": "OTHER-021",
+    "serialNumber": 21,
+    "title": "Date of ESI challan payment",
+    "type": "ESI Act",
+    "particulars": "Copy of ESI challan paid on or before 15of every month",
+    "statutoryRequirement": "Copy of ESI challan paid on or before 15of every month"
+  },
+  {
+    "id": "OTHER-022",
+    "serialNumber": 22,
+    "title": "LWF registration",
+    "type": "LWF",
+    "particulars": "Labour Welfare Fund registration copy",
+    "statutoryRequirement": "Labour Welfare Fund registration copy"
+  },
+  {
+    "id": "OTHER-023",
+    "serialNumber": 23,
+    "title": "LWF challan",
+    "type": "LWF",
+    "particulars": "Copy of paid Labour Welfare Fund Challan (in applicable month)",
+    "statutoryRequirement": "Copy of paid Labour Welfare Fund Challan (in applicable month)"
+  },
+  {
+    "id": "OTHER-024",
+    "serialNumber": 24,
+    "title": "Date of LWF payment",
+    "type": "LWF",
+    "particulars": "Labour Welfare Fund paid within 15 days of completion of eligible month",
+    "statutoryRequirement": "Labour Welfare Fund paid within 15 days of completion of eligible month"
+  },
+  {
+    "id": "OTHER-025",
+    "serialNumber": 25,
+    "title": "In-Out Register",
+    "type": "Other",
+    "particulars": "In-out register to crosscheck of Actual Attendance i.e. In & Out timings, Overtimes and Weekly off details of every employee.",
+    "statutoryRequirement": "In-out register to crosscheck of Actual Attendance i.e. In & Out timings, Overtimes and Weekly off details of every employee."
+  },
+  {
+    "id": "OTHER-026",
+    "serialNumber": 26,
+    "title": "Weekly Off",
+    "type": "Min Wages",
+    "particulars": "Weekly Off observed for every SIX days of working",
+    "statutoryRequirement": "Weekly Off observed for every SIX days of working"
+  },
+  {
+    "id": "OTHER-027",
+    "serialNumber": 27,
+    "title": "Exemption",
+    "type": "Min Wages",
+    "particulars": "Exemption to maintain computerized records Under Minimum Wages Act",
+    "statutoryRequirement": "Exemption to maintain computerized records Under Minimum Wages Act"
+  },
+  {
+    "id": "OTHER-028",
+    "serialNumber": 28,
+    "title": "Notice required to be displayed at work site",
+    "type": "Min Wages",
+    "particulars": "Notices required to be displayed at work site, under Minimum Wages Act, showing rates of wages, hours of work, wage periods, date of payment of unpaid wages, Name and addresses of inspector in English, Hindi and in a local language",
+    "statutoryRequirement": "Notices required to be displayed at work site, under Minimum Wages Act, showing rates of wages, hours of work, wage periods, date of payment of unpaid wages, Name and addresses of inspector in English, Hindi and in a local language"
+  },
+  {
+    "id": "OTHER-029",
+    "serialNumber": 29,
+    "title": "Minimum Wages",
+    "type": "Min Wages",
+    "particulars": "Compliance as per latest Minimum Wages",
+    "statutoryRequirement": "Compliance as per latest Minimum Wages"
+  },
+  {
+    "id": "OTHER-030",
+    "serialNumber": 30,
+    "title": "Salary Payment - Date",
+    "type": "Payment of Wages Act",
+    "particulars": "Is the date of payment mentioned, are the salaries paid on or before 7th/10th of every month",
+    "statutoryRequirement": "Is the date of payment mentioned, are the salaries paid on or before 7th/10th of every month"
+  },
+  {
+    "id": "OTHER-031",
+    "serialNumber": 31,
+    "title": "Proof of Payment",
+    "type": "Payment of Wages Act",
+    "particulars": "The Copy of Bank Transfer / Copy of Cheque brought for verification & tallying with Net Pay of Salary Register",
+    "statutoryRequirement": "The Copy of Bank Transfer / Copy of Cheque brought for verification & tallying with Net Pay of Salary Register"
+  },
+  {
+    "id": "OTHER-032",
+    "serialNumber": 32,
+    "title": "Bonus Register & Bonus Returns",
+    "type": "Bonus Act",
+    "particulars": "Bonus Register in Form C & Bonus Annual Returns in  Form D",
+    "statutoryRequirement": "Bonus Register in Form C & Bonus Annual Returns in  Form D"
+  },
+  {
+    "id": "OTHER-033",
+    "serialNumber": 33,
+    "title": "PF Regn Code",
+    "type": "PF Act",
+    "particulars": "Proof of having PF registration",
+    "statutoryRequirement": "Proof of having PF registration"
+  },
+  {
+    "id": "OTHER-034",
+    "serialNumber": 34,
+    "title": "PF Contributions",
+    "type": "PF Act",
+    "particulars": "PF challan for current month",
+    "statutoryRequirement": "PF challan for current month"
+  },
+  {
+    "id": "OTHER-035",
+    "serialNumber": 35,
+    "title": "PF On Time",
+    "type": "PF Act",
+    "particulars": "PF challan paid on or Before 15th of every month",
+    "statutoryRequirement": "PF challan paid on or Before 15th of every month"
+  },
+  {
+    "id": "OTHER-036",
+    "serialNumber": 36,
+    "title": "PF online monthly register",
+    "type": "PF Act",
+    "particulars": "PF online monthly register ECR copy in PDF format with employees details working on site during the month with contribution verification on random basis",
+    "statutoryRequirement": "PF online monthly register ECR copy in PDF format with employees details working on site during the month with contribution verification on random basis"
+  },
+  {
+    "id": "OTHER-037",
+    "serialNumber": 37,
+    "title": "EDLI Exemption",
+    "type": "PF Act",
+    "particulars": "Copy of EDLI Exemption produce for verification",
+    "statutoryRequirement": "Copy of EDLI Exemption produce for verification"
+  },
+  {
+    "id": "OTHER-038",
+    "serialNumber": 38,
+    "title": "EDLI Monthly Return",
+    "type": "PF Act / EDLI",
+    "particulars": "Form 7 IF (Applicable if PF Trust is in place under Section 17)",
+    "statutoryRequirement": "Form 7 IF (Applicable if PF Trust is in place under Section 17)"
+  },
+  {
+    "id": "OTHER-039",
+    "serialNumber": 39,
+    "title": "Form 11",
+    "type": "PF Act",
+    "particulars": "Produce for all Employees.",
+    "statutoryRequirement": "Produce for all Employees."
+  },
+  {
+    "id": "OTHER-040",
+    "serialNumber": 40,
+    "title": "Prof Tax",
+    "type": "Pr. Tax",
+    "particulars": "PT Registration & Monthly Challan",
+    "statutoryRequirement": "PT Registration & Monthly Challan"
+  },
+  {
+    "id": "OTHER-041",
+    "serialNumber": 41,
+    "title": "Minimum Leaves",
+    "type": "S&E Act",
+    "particulars": "Whether minimum leaves entitled availed as per Shops Establishment Rules. (Leave register and Leave card)",
+    "statutoryRequirement": "Whether minimum leaves entitled availed as per Shops Establishment Rules. (Leave register and Leave card)"
+  },
+  {
+    "id": "OTHER-042",
+    "serialNumber": 42,
+    "title": "Monthly Summary",
+    "type": "Other",
+    "particulars": "Monthly Summary under PF / ESI / LWF in Karma Format",
+    "statutoryRequirement": "Monthly Summary under PF / ESI / LWF in Karma Format"
+  },
+  {
+    "id": "OTHER-043",
+    "serialNumber": 43,
+    "title": "Salary Break up",
+    "type": "Other",
+    "particulars": "Salary breakup same as per the contract / LOI / agreement",
+    "statutoryRequirement": "Salary breakup same as per the contract / LOI / agreement"
+  },
+  {
+    "id": "OTHER-044",
+    "serialNumber": 44,
+    "title": "Sample Interview",
+    "type": "Other",
+    "particulars": "Cross-Check with few employees on Salary Payment, Identity Cards, ESI Cards, PF UAN Number, etc.",
+    "statutoryRequirement": "Cross-Check with few employees on Salary Payment, Identity Cards, ESI Cards, PF UAN Number, etc."
+  }
+]

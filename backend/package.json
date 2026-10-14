@@ -1,0 +1,40 @@
+{
+  "name": "compliance-calculator-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Standalone Compliance Score Calculator",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --runInBand"
+  },
+  "keywords": [
+    "compliance",
+    "calculator",
+    "excel",
+    "express",
+    "node"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^14.5.0",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "pdfkit": "^0.20.2",
+    "pptxgenjs": "^4.0.1",
+    "uuid": "^14.0.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^6.3.3"
+  }
+}
