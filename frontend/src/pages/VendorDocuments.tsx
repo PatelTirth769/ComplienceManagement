@@ -3,7 +3,7 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   LayoutDashboard, User, FileCheck, FolderOpen, 
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Upload, FileText, Download, CheckCircle2,
-  FileCheck2, ShieldCheck, ChevronDown
+  FileCheck2, ShieldCheck, ChevronDown, Search, X, Calendar, FileUp, Loader2
 } from 'lucide-react';
 import { getVendorDashboardStats, uploadVendorDocument, getVendorDocuments, getVendorDocumentUrl, getVendorAudits } from '../services/api';
 
@@ -14,6 +14,8 @@ export const VendorDocuments: React.FC = () => {
   const [activeAudit, setActiveAudit] = useState<any>(null);
   const [documents, setDocuments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [docType, setDocType] = useState('General');
@@ -175,269 +177,335 @@ export const VendorDocuments: React.FC = () => {
     );
   }
 
-  return (
-    <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems}>
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-        .select-field {
-          width: 100%;
-          padding: 0.75rem 2.5rem 0.75rem 1rem;
-          border-radius: 10px;
-          border: 1px solid #CBD5E1;
-          font-size: 0.9rem;
-          color: #0B1F3A;
-          outline: none;
-          background: #FFFFFF;
-          appearance: none;
-          cursor: pointer;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .select-field:focus {
-          border-color: #1565C0;
-          box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
-        }
-      `}</style>
+  const filteredDocs = documents.filter((doc: any) => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = (doc.fileName || '').toLowerCase().includes(term) || (doc.type || '').toLowerCase().includes(term);
+    const matchesCategory = categoryFilter === 'ALL' || (doc.type || '').toLowerCase() === categoryFilter.toLowerCase();
+    return matchesSearch && matchesCategory;
+  });
 
-      {/* Header Banner */}
-      <div style={{ marginBottom: '1.75rem', animation: 'fadeIn 0.3s ease' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.25rem' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FolderOpen style={{ width: '20px', height: '20px', color: '#1565C0' }} />
+  return (
+    <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems} hideBackButton={true}>
+      {/* 1. Executive Page Header */}
+      <div className="admin-page-header">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="admin-header-title">Audit Document Vault</h1>
+            <span className="admin-header-badge">
+              <span className="pulse-dot"></span> Evidence Repository
+            </span>
           </div>
-          <h1 style={{ fontSize: '1.625rem', fontWeight: 800, color: '#0B1F3A', margin: 0, letterSpacing: '-0.02em' }}>Audit Documents</h1>
+          <p className="admin-header-subtitle">
+            Upload, verify, and manage statutory compliance evidence for ongoing and historical audit cycles.
+          </p>
         </div>
-        <p style={{ color: '#64748B', fontSize: '0.875rem', margin: 0, paddingLeft: '2.875rem' }}>
-          Upload and manage compliance documents required for your active audit evaluation.
-        </p>
+      </div>
+
+      {/* 2. KPI Summary Grid */}
+      <div className="admin-kpi-grid-3col">
+        <div className="admin-kpi-card blue">
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-label">Verified Documents</span>
+            <div className="admin-kpi-icon-wrapper blue">
+              <FileCheck className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="admin-kpi-value">{documents.length} Files</div>
+          <span className="admin-kpi-subtext">Filed in statutory compliance docket</span>
+          <span className="admin-kpi-badge">Vault Active</span>
+        </div>
+
+        <div className="admin-kpi-card emerald">
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-label">Active Audit Scope</span>
+            <div className="admin-kpi-icon-wrapper emerald">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="admin-kpi-value">{activeAudit?.auditPeriod || 'Q3 2026'}</div>
+          <span className="admin-kpi-subtext">{activeAudit?.auditIdString || 'Cycle Target'} · {activeAudit?.status || 'Active'}</span>
+          <span className="admin-kpi-badge">In Scope</span>
+        </div>
+
+        <div className="admin-kpi-card indigo">
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-label">Acceptance Standard</span>
+            <div className="admin-kpi-icon-wrapper indigo">
+              <FileUp className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="admin-kpi-value">PDF, PNG, JPG</div>
+          <span className="admin-kpi-subtext">Up to 10 MB per verified file</span>
+          <span className="admin-kpi-badge">Certified</span>
+        </div>
       </div>
 
       {!activeAudit ? (
-        <div style={{
-          background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0',
-          padding: '4rem 2rem', textAlign: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.04)'
-        }}>
+        <div className="vdocs-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#F8FAFC', border: '1px dashed #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
             <FolderOpen style={{ width: '32px', height: '32px', color: '#94A3B8' }} />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0B1F3A', margin: '0 0 0.5rem' }}>No Active Audit</h3>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0B1F3A', margin: '0 0 0.5rem' }}>No Active Audit Found</h3>
           <p style={{ color: '#64748B', fontSize: '0.875rem', margin: 0, maxWidth: '400px', marginInline: 'auto' }}>
-            Document submission is available when an audit is scheduled or in progress for your account.
+            Document submission will become available once an audit cycle is scheduled or in progress for your vendor account.
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: '1.5rem', alignItems: 'start' }}>
-          
-          {/* Upload Document Panel */}
-          <div style={{
-            background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0',
-            boxShadow: '0 1px 6px rgba(0,0,0,0.04)', padding: '1.5rem', animation: 'fadeIn 0.4s ease 0.1s both'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #F1F5F9' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Upload style={{ width: '16px', height: '16px', color: '#1565C0' }} />
-              </div>
-              <h3 style={{ fontWeight: 700, color: '#0B1F3A', fontSize: '1.05rem', margin: 0 }}>Upload Document</h3>
-            </div>
-
-            {/* Select Target Audit */}
-            {audits.length > 0 && (
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#0B1F3A', marginBottom: '0.375rem' }}>
-                  Select Audit
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <select 
-                    className="select-field"
-                    value={selectedAuditId}
-                    onChange={(e) => handleAuditChange(e.target.value)}
-                  >
-                    {audits.map((audit) => (
-                      <option key={audit.id} value={audit.id}>
-                        {audit.auditPeriod || 'Audit'} ({audit.auditIdString || audit.id}) - {audit.status || 'Active'}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: '#94A3B8', pointerEvents: 'none' }} />
+        <div className="vdocs-layout-grid">
+          {/* Left: Upload Document Card */}
+          <div className="vdocs-card">
+            <div className="vdocs-card-header">
+              <div className="vdocs-card-title-group">
+                <div className="vdocs-card-icon-box blue">
+                  <Upload className="w-4 h-4" />
                 </div>
+                <h3 className="vdocs-card-title">Upload Compliance Evidence</h3>
               </div>
-            )}
-
-            {/* Select Document Type */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#0B1F3A', marginBottom: '0.375rem' }}>
-                Document Category
-              </label>
-              <div style={{ position: 'relative' }}>
-                <select 
-                  className="select-field"
-                  value={docType}
-                  onChange={(e) => setDocType(e.target.value)}
-                >
-                  <option value="General">General Compliance</option>
-                  <option value="License">License & Registration</option>
-                  <option value="Policy">Company Policy / Standing Orders</option>
-                  <option value="Payroll">Payroll & Muster Rolls</option>
-                  <option value="Proof">Challans & Proof of Payment</option>
-                </select>
-                <ChevronDown style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: '#94A3B8', pointerEvents: 'none' }} />
-              </div>
-            </div>
-
-            {/* Select File Dropzone */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#0B1F3A', marginBottom: '0.375rem' }}>
-                Select File
-              </label>
-
-              <label 
-                htmlFor="file-upload-input"
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '1.5rem 1rem', borderRadius: '12px',
-                  border: '2px dashed #CBD5E1', background: '#F8FAFC',
-                  cursor: 'pointer', transition: 'all 0.2s ease', textAlign: 'center'
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = '#1565C0';
-                  (e.currentTarget as HTMLElement).style.background = '#EFF6FF';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = '#CBD5E1';
-                  (e.currentTarget as HTMLElement).style.background = '#F8FAFC';
-                }}
-              >
-                <Upload style={{ width: '28px', height: '28px', color: '#1565C0', marginBottom: '0.5rem' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1565C0', marginBottom: '0.25rem' }}>
-                  Choose file to upload
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>PDF, PNG, JPG up to 10MB</span>
-                <input 
-                  id="file-upload-input"
-                  type="file" 
-                  style={{ display: 'none' }} 
-                  onChange={handleFileChange} 
-                />
-              </label>
-
-              {fileToUpload && (
-                <div style={{
-                  marginTop: '0.75rem', padding: '0.625rem 0.875rem', borderRadius: '8px',
-                  background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46',
-                  display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', fontWeight: 600
-                }}>
-                  <FileText style={{ width: '16px', height: '16px', color: '#10B981', flexShrink: 0 }} />
-                  <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileToUpload.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <button 
-              onClick={handleUpload}
-              disabled={!fileToUpload || isUploading}
-              style={{
-                width: '100%', padding: '0.75rem 1rem', borderRadius: '10px',
-                background: !fileToUpload || isUploading ? '#CBD5E1' : 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)',
-                color: 'white', fontWeight: 700, fontSize: '0.9rem',
-                border: 'none', cursor: !fileToUpload || isUploading ? 'not-allowed' : 'pointer',
-                boxShadow: fileToUpload && !isUploading ? '0 4px 12px rgba(21, 101, 192, 0.25)' : 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Upload style={{ width: '16px', height: '16px' }} />
-              {isUploading ? 'Uploading to S3...' : 'Submit Document'}
-            </button>
-          </div>
-
-          {/* Uploaded Documents List */}
-          <div style={{
-            background: 'white', borderRadius: '16px', border: '1px solid #E2E8F0',
-            boxShadow: '0 1px 6px rgba(0,0,0,0.04)', padding: '1.5rem', animation: 'fadeIn 0.4s ease 0.2s both'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #F1F5F9' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileCheck2 style={{ width: '16px', height: '16px', color: '#059669' }} />
-                </div>
-                <h3 style={{ fontWeight: 700, color: '#0B1F3A', fontSize: '1.05rem', margin: 0 }}>Uploaded Documents</h3>
-              </div>
-              <span style={{
-                background: '#EFF6FF', color: '#1565C0', border: '1px solid #BFDBFE',
-                padding: '0.2rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700
-              }}>
-                {documents.length} Files Uploaded
+              <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                Vault Ingestion
               </span>
             </div>
 
-            {documents.length > 0 ? (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8375rem' }}>
-                  <thead>
-                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>File Name</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Category</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Date Uploaded</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documents.map((doc: any, i: number) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: i % 2 === 0 ? '#FFFFFF' : '#FAFCFF' }}>
-                        <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: '#0B1F3A' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                            <FileText style={{ width: '18px', height: '18px', color: '#1565C0', flexShrink: 0 }} />
-                            <span style={{ wordBreak: 'break-all' }}>{doc.fileName}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.875rem 1rem', color: '#475569', fontWeight: 500 }}>{doc.type}</td>
-                        <td style={{ padding: '0.875rem 1rem' }}>
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            padding: '0.2rem 0.625rem', borderRadius: '999px',
-                            background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0',
-                            fontSize: '0.725rem', fontWeight: 700
-                          }}>
-                            <CheckCircle2 style={{ width: '12px', height: '12px', color: '#10B981' }} />
-                            {doc.status || 'Uploaded'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.875rem 1rem', color: '#64748B' }}>
-                          {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'}
-                        </td>
-                        <td style={{ padding: '0.875rem 1rem', textAlign: 'right' }}>
-                          <button 
-                            onClick={() => handleDownload(doc)}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                              padding: '0.375rem 0.75rem', borderRadius: '8px',
-                              background: '#EFF6FF', color: '#1565C0', border: '1px solid #BFDBFE',
-                              fontSize: '0.775rem', fontWeight: 700, cursor: 'pointer',
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <Download style={{ width: '14px', height: '14px' }} />
-                            Download
-                          </button>
-                        </td>
+            <div className="vdocs-card-body">
+              {/* Select Target Audit */}
+              {audits.length > 0 && (
+                <div className="vdocs-form-group">
+                  <label className="vdocs-label">Select Audit Engagement</label>
+                  <div className="vdocs-select-wrapper">
+                    <select 
+                      className="vdocs-select"
+                      value={selectedAuditId}
+                      onChange={(e) => handleAuditChange(e.target.value)}
+                    >
+                      {audits.map((audit) => (
+                        <option key={audit.id} value={audit.id}>
+                          {audit.auditPeriod || 'Audit'} ({audit.auditIdString || audit.id}) - {audit.status || 'Active'}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="vdocs-select-arrow" />
+                  </div>
+                </div>
+              )}
+
+              {/* Select Document Type */}
+              <div className="vdocs-form-group">
+                <label className="vdocs-label">Document Category</label>
+                <div className="vdocs-select-wrapper">
+                  <select 
+                    className="vdocs-select"
+                    value={docType}
+                    onChange={(e) => setDocType(e.target.value)}
+                  >
+                    <option value="General">General Compliance</option>
+                    <option value="License">License & Statutory Registration</option>
+                    <option value="Policy">Company Policy / Standing Orders</option>
+                    <option value="Payroll">Payroll, Wages & Muster Rolls</option>
+                    <option value="Proof">Challans & Proof of Payment (EPF/ESI)</option>
+                  </select>
+                  <ChevronDown className="vdocs-select-arrow" />
+                </div>
+              </div>
+
+              {/* Select File Dropzone */}
+              <div className="vdocs-form-group">
+                <label className="vdocs-label">Select File Attachment</label>
+                <label 
+                  htmlFor="file-upload-input"
+                  className="vdocs-dropzone"
+                >
+                  <div className="vdocs-dropzone-icon-circle">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <span className="vdocs-dropzone-primary-text">
+                    Choose statutory document
+                  </span>
+                  <span className="vdocs-dropzone-hint">
+                    PDF, PNG, JPG (Max 10 MB)
+                  </span>
+                  <input 
+                    id="file-upload-input"
+                    type="file" 
+                    style={{ display: 'none' }} 
+                    onChange={handleFileChange} 
+                  />
+                </label>
+
+                {fileToUpload && (
+                  <div className="vdocs-selected-chip">
+                    <div className="vdocs-selected-info">
+                      <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="vdocs-selected-name" title={fileToUpload.name}>
+                        {fileToUpload.name}
+                      </span>
+                    </div>
+                    <button 
+                      type="button"
+                      className="vdocs-selected-remove"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFileToUpload(null);
+                        const fileInput = document.getElementById('file-upload-input') as HTMLInputElement;
+                        if (fileInput) fileInput.value = '';
+                      }}
+                      title="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Button */}
+              <button 
+                onClick={handleUpload}
+                disabled={!fileToUpload || isUploading}
+                className={`vdocs-submit-btn ${!fileToUpload || isUploading ? 'disabled' : 'enabled'}`}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Uploading to Vault...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Submit Document to Vault</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Uploaded Documents Table Card */}
+          <div className="vdocs-card">
+            <div className="vdocs-card-header">
+              <div className="vdocs-card-title-group">
+                <div className="vdocs-card-icon-box emerald">
+                  <FileCheck2 className="w-4 h-4" />
+                </div>
+                <h3 className="vdocs-card-title">Uploaded Documents Repository</h3>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                {documents.length} {documents.length === 1 ? 'File' : 'Files'} Uploaded
+              </span>
+            </div>
+
+            <div className="table-toolbar" style={{ padding: '0.875rem 1.375rem', borderBottom: '1px solid #F1F5F9' }}>
+              <div className="search-input-wrapper" style={{ maxWidth: '280px' }}>
+                <Search className="search-input-icon" />
+                <input 
+                  type="text" 
+                  placeholder="Filter uploaded files..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="General">General</option>
+                  <option value="License">License</option>
+                  <option value="Policy">Policy</option>
+                  <option value="Payroll">Payroll</option>
+                  <option value="Proof">Proof</option>
+                </select>
+                <span className="text-xs text-slate-500 font-semibold hidden sm:inline">
+                  Showing {filteredDocs.length} of {documents.length}
+                </span>
+              </div>
+            </div>
+
+            <div className="vdocs-card-body" style={{ padding: 0 }}>
+              {filteredDocs.length > 0 ? (
+                <div className="vdocs-table-container">
+                  <table className="vdocs-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '40%', minWidth: '220px' }}>File Name</th>
+                        <th style={{ width: '18%', minWidth: '120px' }}>Category</th>
+                        <th style={{ width: '15%', minWidth: '100px' }}>Status</th>
+                        <th style={{ width: '15%', minWidth: '110px' }}>Date Uploaded</th>
+                        <th style={{ width: '12%', minWidth: '100px', textAlign: 'right' }}>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div style={{
-                textAlign: 'center', padding: '3.5rem 1.5rem',
-                borderRadius: '12px', border: '2px dashed #E2E8F0', background: '#FAFCFF'
-              }}>
-                <FolderOpen style={{ width: '44px', height: '44px', color: '#CBD5E1', margin: '0 auto 0.75rem' }} />
-                <h4 style={{ fontWeight: 800, color: '#0B1F3A', margin: '0 0 0.375rem', fontSize: '1rem' }}>No Documents Uploaded Yet</h4>
-                <p style={{ color: '#64748B', fontSize: '0.8375rem', margin: 0, maxWidth: '340px', marginInline: 'auto' }}>
-                  Upload required compliance certificates, licenses, or payroll documents using the form on the left.
-                </p>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {filteredDocs.map((doc: any, i: number) => {
+                        const isPdf = (doc.fileName || '').toLowerCase().endsWith('.pdf');
+                        const isImg = /\.(png|jpe?g|webp)$/i.test(doc.fileName || '');
+
+                        return (
+                          <tr key={doc.id || i}>
+                            <td>
+                              <div className="vdocs-filename-cell">
+                                <div className="vdocs-file-icon">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <span className="vdocs-file-name-text" title={doc.fileName}>
+                                    {doc.fileName}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    {isPdf ? 'PDF Document' : isImg ? 'Image Evidence' : 'Compliance Attachment'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="vdocs-category-pill">
+                                {doc.type || 'General'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="vdocs-status-pill">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {doc.status || 'Uploaded'}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'}
+                              </div>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button 
+                                onClick={() => handleDownload(doc)}
+                                className="vdocs-download-btn"
+                                title="Download file"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Download</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : documents.length > 0 ? (
+                <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: '#64748B' }}>
+                  <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="font-bold text-slate-700 text-sm">No matching documents found</p>
+                  <p className="text-xs text-slate-400 mt-1">Try refining your search keyword or category filter.</p>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '4rem 1.5rem', background: '#FAFCFF' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
+                    <FolderOpen className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <h4 style={{ fontWeight: 800, color: '#0F172A', margin: '0 0 0.35rem', fontSize: '1rem' }}>No Documents Uploaded Yet</h4>
+                  <p style={{ color: '#64748B', fontSize: '0.8rem', margin: 0, maxWidth: '340px', marginInline: 'auto' }}>
+                    Upload required compliance certificates, licenses, or payroll evidence using the form on the left.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

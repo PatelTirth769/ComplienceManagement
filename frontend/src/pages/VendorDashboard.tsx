@@ -91,7 +91,7 @@ export const VendorDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems} hideBackButton={true}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '280px' }}>
           <div style={{
             width: '42px', height: '42px', border: '3px solid #EFF6FF',
@@ -108,7 +108,7 @@ export const VendorDashboard: React.FC = () => {
   const progressPct = getProgressPercentage(activeAudit);
 
   return (
-    <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems}>
+    <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems} hideBackButton={true}>
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
       `}</style>

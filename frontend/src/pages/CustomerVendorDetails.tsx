@@ -76,7 +76,7 @@ export const CustomerVendorDetails: React.FC = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} hideBackButton={true}>
         <div style={{ padding: '4rem', textAlign: 'center' }}>
           <div style={{
             width: '40px', height: '40px', border: '3px solid #EFF6FF',
@@ -91,13 +91,7 @@ export const CustomerVendorDetails: React.FC = () => {
 
   if (error || !vendorDetails) {
     return (
-      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
-        <div style={{ marginBottom: '1rem' }}>
-          <Link to="/customer/vendors" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#1565C0', textDecoration: 'none', fontWeight: 700, fontSize: '0.8375rem' }}>
-            <ArrowLeft style={{ width: '16px', height: '16px' }} />
-            Back to My Vendors
-          </Link>
-        </div>
+      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} backUrl="/customer/vendors" backLabel="Back to My Vendors">
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '14px', padding: '3rem 2rem', textAlign: 'center' }}>
           <AlertCircle style={{ width: '40px', height: '40px', color: '#DC2626', margin: '0 auto 0.75rem' }} />
           <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#991B1B', margin: '0 0 0.5rem' }}>Unable to load vendor details</h3>
@@ -118,7 +112,7 @@ export const CustomerVendorDetails: React.FC = () => {
     : 0;
 
   return (
-    <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
+    <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} backUrl="/customer/vendors" backLabel="Back to My Vendors">
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
         .details-card {
@@ -130,14 +124,6 @@ export const CustomerVendorDetails: React.FC = () => {
           margin-bottom: 1.5rem;
         }
       `}</style>
-
-      {/* Top Navigation */}
-      <div style={{ marginBottom: '1.25rem', animation: 'fadeIn 0.3s ease' }}>
-        <Link to="/customer/vendors" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', color: '#1565C0', textDecoration: 'none', fontWeight: 700, fontSize: '0.8375rem' }}>
-          <ArrowLeft style={{ width: '16px', height: '16px' }} />
-          Back to My Vendors
-        </Link>
-      </div>
 
       {/* Title Bar */}
       <div className="details-card" style={{ padding: '1.25rem 1.5rem', animation: 'fadeIn 0.3s ease 0.05s both' }}>

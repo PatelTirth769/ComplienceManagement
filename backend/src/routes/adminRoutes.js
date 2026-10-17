@@ -12,6 +12,7 @@ router.get('/stats', adminController.getDashboardStats);
 // User Management (Customers, Vendors, Auditors)
 router.get('/users', adminController.getUsersByRole);
 router.post('/users', adminController.createUser);
+router.delete('/users/:id', adminController.deleteUser);
 
 // Audits Management
 router.get('/audits', adminController.getAudits);

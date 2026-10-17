@@ -16,13 +16,38 @@ export const AdminDashboard: React.FC = () => {
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+        const [statsRes, auditsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/admin/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch(`${API_BASE_URL}/admin/audits`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).catch(() => null)
+        ]);
+
+        const data = await statsRes.json();
+        const auditNameLookup: Record<string, { vendorName?: string; customerName?: string }> = {};
+
+        if (auditsRes && auditsRes.ok) {
+          const auditsData = await auditsRes.json().catch(() => null);
+          if (auditsData?.success && Array.isArray(auditsData.audits)) {
+            auditsData.audits.forEach((aud: any) => {
+              auditNameLookup[aud.id] = {
+                vendorName: aud.vendorName,
+                customerName: aud.customerName
+              };
+            });
           }
-        });
-        const data = await response.json();
+        }
+
         if (data.success) {
+          if (Array.isArray(data.stats?.recentAudits)) {
+            data.stats.recentAudits = data.stats.recentAudits.map((ra: any) => ({
+              ...ra,
+              vendorName: ra.vendorName || auditNameLookup[ra.id]?.vendorName || ra.vendorId,
+              customerName: ra.customerName || auditNameLookup[ra.id]?.customerName || ra.customerId
+            }));
+          }
           setStats(data.stats);
         }
       } catch (error) {
@@ -46,7 +71,7 @@ export const AdminDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Admin Portal Overview" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Admin Portal Overview" sidebarItems={sidebarItems} hideBackButton={true}>
         <div className="flex justify-center items-center h-64">
           <div className="loading-spinner border-[#1565C0] w-12 h-12"></div>
         </div>
@@ -80,12 +105,17 @@ export const AdminDashboard: React.FC = () => {
   const recentAudits = stats?.recentAudits || [];
 
   return (
-    <DashboardLayout title="Admin Portal Overview" sidebarItems={sidebarItems}>
+    <DashboardLayout title="Admin Portal Overview" sidebarItems={sidebarItems} hideBackButton={true}>
       {/* 1. Dashboard Header */}
       <div className="admin-page-header">
         <div>
-          <h1 className="admin-header-title">Admin Portal Overview</h1>
-          <p className="admin-header-subtitle">Monitor vendors, auditors, audits and compliance activities.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="admin-header-title">Admin Portal Overview</h1>
+            <span className="admin-header-badge">
+              <span className="pulse-dot"></span> Live Operations
+            </span>
+          </div>
+          <p className="admin-header-subtitle">Real-time compliance monitoring, audits tracking, and enterprise resource governance.</p>
         </div>
         <Link to="/admin/audits/create" className="db-btn db-btn-primary">
           <Plus className="w-4 h-4 mr-1" /> Create Audit
@@ -94,7 +124,7 @@ export const AdminDashboard: React.FC = () => {
 
       {/* 2. Responsive KPI Cards */}
       <div className="admin-kpi-grid">
-        <div className="admin-kpi-card">
+        <div className="admin-kpi-card blue">
           <div className="admin-kpi-top">
             <span className="admin-kpi-label">Total Customers</span>
             <div className="admin-kpi-icon-wrapper blue">
@@ -103,9 +133,10 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div className="admin-kpi-value">{stats?.totalCustomers || 0}</div>
           <span className="admin-kpi-subtext">Registered customer accounts</span>
+          <span className="admin-kpi-badge">Active Entities</span>
         </div>
 
-        <div className="admin-kpi-card">
+        <div className="admin-kpi-card indigo">
           <div className="admin-kpi-top">
             <span className="admin-kpi-label">Total Vendors</span>
             <div className="admin-kpi-icon-wrapper indigo">
@@ -114,9 +145,10 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div className="admin-kpi-value">{stats?.totalVendors || 0}</div>
           <span className="admin-kpi-subtext">Active compliance vendors</span>
+          <span className="admin-kpi-badge">Verified Pool</span>
         </div>
 
-        <div className="admin-kpi-card">
+        <div className="admin-kpi-card cyan">
           <div className="admin-kpi-top">
             <span className="admin-kpi-label">Total Auditors</span>
             <div className="admin-kpi-icon-wrapper cyan">
@@ -125,9 +157,10 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div className="admin-kpi-value">{stats?.totalAuditors || 0}</div>
           <span className="admin-kpi-subtext">Assigned field auditors</span>
+          <span className="admin-kpi-badge">Field Certified</span>
         </div>
 
-        <div className="admin-kpi-card">
+        <div className="admin-kpi-card amber">
           <div className="admin-kpi-top">
             <span className="admin-kpi-label">Active Audits</span>
             <div className="admin-kpi-icon-wrapper amber">
@@ -136,6 +169,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div className="admin-kpi-value">{stats?.activeAudits || 0}</div>
           <span className="admin-kpi-subtext">In-progress compliance audits</span>
+          <span className="admin-kpi-badge">Real-time Cycle</span>
         </div>
       </div>
 
@@ -144,7 +178,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="audit-summary-card emerald">
           <div className="audit-summary-left">
             <div className="audit-summary-icon-box emerald">
-              <CheckCircle2 style={{ width: '1.25rem', height: '1.25rem' }} />
+              <CheckCircle2 style={{ width: '1.4rem', height: '1.4rem' }} />
             </div>
             <div className="audit-summary-text">
               <span className="audit-summary-label">Completed / Closed Audits</span>
@@ -160,7 +194,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="audit-summary-card amber">
           <div className="audit-summary-left">
             <div className="audit-summary-icon-box amber">
-              <AlertCircle style={{ width: '1.25rem', height: '1.25rem' }} />
+              <AlertCircle style={{ width: '1.4rem', height: '1.4rem' }} />
             </div>
             <div className="audit-summary-text">
               <span className="audit-summary-label">Pending Review Sign-offs</span>
@@ -177,8 +211,11 @@ export const AdminDashboard: React.FC = () => {
       {/* 4. Recent Audits Table Section */}
       <div className="db-card mb-6">
         <div className="db-card-header flex justify-between items-center">
-          <h2 className="db-card-title text-slate-900">Recent Audits</h2>
-          <Link to="/admin/audits" className="text-xs font-bold text-[#1565C0] hover:underline flex items-center gap-1">
+          <div>
+            <h2 className="db-card-title text-slate-900">Recent Audits</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Latest compliance audit submissions and status updates</p>
+          </div>
+          <Link to="/admin/audits" className="text-xs font-bold text-[#0B63E5] hover:underline flex items-center gap-1.5 transition-colors">
             View All Audits <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -201,8 +238,8 @@ export const AdminDashboard: React.FC = () => {
                 <thead>
                   <tr>
                     <th>Audit ID</th>
-                    <th>Vendor ID</th>
-                    <th>Customer ID</th>
+                    <th>Vendor Name</th>
+                    <th>Customer Name</th>
                     <th>Audit Period</th>
                     <th>Status</th>
                     <th>Score</th>
@@ -210,30 +247,42 @@ export const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentAudits.map((a: any) => (
-                    <tr key={a.id}>
-                      <td className="font-mono font-bold text-slate-900">{a.auditIdString}</td>
-                      <td className="font-medium text-slate-700">{a.vendorId}</td>
-                      <td className="font-medium text-slate-700">{a.customerId}</td>
-                      <td className="font-semibold text-slate-800">{a.auditPeriod}</td>
-                      <td>{getStatusBadge(a.status)}</td>
-                      <td>
-                        {a.score !== null ? (
-                          <span className="font-extrabold text-[#1565C0] text-sm">{a.score}%</span>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">N/A</span>
-                        )}
-                      </td>
-                      <td className="text-right">
-                        <Link 
-                          to={`/admin/audits/${a.id}`} 
-                          className="db-btn db-btn-outline text-xs py-1 px-2.5 inline-flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {recentAudits.map((a: any) => {
+                    const vendorDisplay = a.vendorName && a.vendorName !== 'N/A' ? a.vendorName : a.vendorId;
+                    const customerDisplay = a.customerName && a.customerName !== 'N/A' ? a.customerName : a.customerId;
+                    const formattedScore = a.score !== null && a.score !== undefined 
+                      ? (typeof a.score === 'number' ? Math.round(a.score * 10) / 10 : a.score) 
+                      : null;
+
+                    return (
+                      <tr key={a.id}>
+                        <td>
+                          <span className="audit-id-badge">{a.auditIdString}</span>
+                        </td>
+                        <td className="font-semibold text-slate-800">{vendorDisplay}</td>
+                        <td className="font-semibold text-slate-800">{customerDisplay}</td>
+                        <td className="font-semibold text-slate-800">{a.auditPeriod}</td>
+                        <td>{getStatusBadge(a.status)}</td>
+                        <td>
+                          {formattedScore !== null ? (
+                            <span className={`score-badge-pill ${Number(formattedScore) >= 80 ? 'high' : Number(formattedScore) >= 50 ? 'medium' : 'low'}`}>
+                              {formattedScore}%
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">N/A</span>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <Link 
+                            to={`/admin/audits/${a.id}`} 
+                            className="db-btn db-btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

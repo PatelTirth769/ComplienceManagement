@@ -97,7 +97,7 @@ export const VendorAuditDetails: React.FC = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems} hideBackButton={true}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '64px', marginTop: '120px' }}>
           <div style={{ 
             width: '48px', height: '48px', border: '3px solid #EFF6FF',
@@ -111,7 +111,7 @@ export const VendorAuditDetails: React.FC = () => {
 
   if (!audit) {
     return (
-      <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems} backUrl="/vendor/audits" backLabel="Back to Audits">
         <div style={{ textAlign: 'center', padding: '6rem 2rem' }}>
           <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
             <AlertTriangle style={{ width: '36px', height: '36px', color: '#EF4444' }} />
@@ -137,16 +137,16 @@ export const VendorAuditDetails: React.FC = () => {
   const scoreColor = hasScore ? getScoreColor(audit.score) : '#94A3B8';
 
   return (
-    <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems}>
+    <DashboardLayout title="Vendor Portal" sidebarItems={sidebarItems} backUrl="/vendor/audits" backLabel="Back to Audits">
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }`}</style>
 
       {/* Breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '0.8375rem', color: '#94A3B8' }}>
-        <Link to="/vendor/audits" style={{ color: '#94A3B8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.375rem', fontWeight: 500, transition: 'color 0.2s' }}
+        <Link to="/vendor/audits" style={{ color: '#64748B', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.375rem', fontWeight: 600, transition: 'color 0.2s' }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1565C0'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#94A3B8'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#64748B'}
         >
-          <ArrowLeft style={{ width: '13px', height: '13px' }} /> My Audits
+          My Audits
         </Link>
         <ChevronRight style={{ width: '13px', height: '13px' }} />
         <span style={{ color: '#0B1F3A', fontWeight: 600 }}>{audit.auditPeriod}</span>

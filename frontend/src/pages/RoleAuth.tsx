@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, 
+  Shield,
   Mail, 
   Lock, 
   User as UserIcon, 
@@ -12,26 +13,35 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
-  FileSearch,
-  CheckSquare,
-  ShieldAlert,
+  ArrowLeft,
   Building2,
-  MapPin
+  MapPin,
+  LogIn,
+  UserPlus,
+  Info
 } from 'lucide-react';
 import './RoleAuth.css';
 
 export const RoleAuth: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { role } = useParams<{ role: string }>();
   const { login, register } = useAuth();
   
-  const isLogin = location.pathname.startsWith('/login');
-  const validRoles = ['admin', 'customer', 'auditor', 'vendor'];
+  const normalizedRole = (role || '').toLowerCase();
+  const validRoles = ['admin', 'customer', 'auditor', 'vendor', 'auditee'];
   
-  const displayRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
+  // Canonical role for redirects and backend (auditee maps to vendor)
+  const canonicalRole = normalizedRole === 'auditee' ? 'vendor' : normalizedRole;
+  const displayRole = canonicalRole === 'vendor' ? 'Vendor' : canonicalRole.charAt(0).toUpperCase() + canonicalRole.slice(1);
+  const portalName = canonicalRole === 'vendor' ? 'Vendor Portal' : `${displayRole} Portal`;
   
-  // Form States
+  // Always default to 'login' unless explicitly specified via query param ?tab=register
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(() => {
+    return searchParams.get('tab') === 'register' ? 'register' : 'login';
+  });
+
+  // Form States - guaranteed empty on load
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -42,37 +52,15 @@ export const RoleAuth: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Status States
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!role || !validRoles.includes(role.toLowerCase())) {
-      navigate('/');
-    }
-  }, [role, navigate]);
-
-  // Reset all fields when switching between login/register or changing roles
-  useEffect(() => {
-    setError('');
-    setSuccess('');
-    setFullName('');
-    setCompanyName('');
-    setContactPerson('');
-    setAddress('');
-    setEmail('');
-    setPhone('');
-    setPassword('');
-    setConfirmPassword('');
-  }, [isLogin, role]);
-
-  const toggleMode = () => {
-    navigate(isLogin ? `/register/${role}` : `/login/${role}`);
-    setError('');
-    setSuccess('');
-    // Reset fields
+  const clearFields = () => {
     setFullName('');
     setCompanyName('');
     setContactPerson('');
@@ -83,27 +71,69 @@ export const RoleAuth: React.FC = () => {
     setConfirmPassword('');
   };
 
+  useEffect(() => {
+    if (!role || !validRoles.includes(normalizedRole)) {
+      navigate('/');
+    }
+  }, [role, normalizedRole, navigate]);
+
+  // Clear fields and alerts whenever role or tab changes
+  useEffect(() => {
+    setError('');
+    setSuccess('');
+    setInfoMessage('');
+    clearFields();
+    
+    // Extra safety pass to purge browser autofill attempts on mount
+    const timer = setTimeout(() => {
+      clearFields();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [role, activeTab]);
+
+  const switchTab = (tab: 'login' | 'register') => {
+    setActiveTab(tab);
+    setError('');
+    setSuccess('');
+    setInfoMessage('');
+    clearFields();
+    
+    // Ensure viewport scrolls to top of the card so title and tabs are visible
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
+
+  const handleForgotPassword = () => {
+    setError('');
+    setSuccess('');
+    setInfoMessage('To reset your password, please contact your system administrator or check your registered email for recovery instructions.');
+  };
+
   const validateRegistration = () => {
     if (!email || !password || !confirmPassword || !phone) {
       setError('Please fill out all required fields.');
       return false;
     }
     
-    if (role === 'admin' || role === 'auditor') {
+    if (canonicalRole === 'admin' || canonicalRole === 'auditor') {
       if (!fullName) {
-        setError('Full Name is required.'); return false;
+        setError('Full Name is required.'); 
+        return false;
       }
     }
     
-    if (role === 'customer') {
+    if (canonicalRole === 'customer') {
       if (!fullName || !companyName) {
-        setError('Full Name and Company Name are required.'); return false;
+        setError('Full Name and Company Name are required.'); 
+        return false;
       }
     }
     
-    if (role === 'vendor') {
+    if (canonicalRole === 'vendor') {
       if (!companyName || !contactPerson || !address) {
-        setError('Company Name, Contact Person, and Address are required.'); return false;
+        setError('Company Name, Contact Person, and Address are required.'); 
+        return false;
       }
     }
 
@@ -140,10 +170,11 @@ export const RoleAuth: React.FC = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setInfoMessage('');
     setIsLoading(true);
 
     try {
-      if (isLogin) {
+      if (activeTab === 'login') {
         if (!validateLogin()) {
           setIsLoading(false);
           return;
@@ -151,10 +182,10 @@ export const RoleAuth: React.FC = () => {
         
         await login(email, password, displayRole as any);
         
-        setSuccess('Login successful! Redirecting...');
+        setSuccess('Login successful! Redirecting to dashboard...');
         setTimeout(() => {
-          navigate(`/${role}`); // e.g. /admin, /vendor, /auditor, /customer
-        }, 1000);
+          navigate(`/${canonicalRole}`); // e.g. /admin, /vendor, /auditor, /customer
+        }, 800);
         
       } else {
         if (!validateRegistration()) {
@@ -175,10 +206,22 @@ export const RoleAuth: React.FC = () => {
         
         setSuccess('Account created successfully! Redirecting...');
         setTimeout(() => {
-          navigate(`/${role}`);
-        }, 1500);
+          navigate(`/${canonicalRole}`);
+        }, 1200);
       }
     } catch (err: any) {
+      if (activeTab === 'login') {
+        const errorMsg = (err.response?.data?.error || err.message || '').toLowerCase();
+        if (
+          err.response?.status === 401 || 
+          err.response?.status === 403 || 
+          errorMsg.includes('registered as') ||
+          errorMsg.includes('invalid')
+        ) {
+          setError('Invalid email or password.');
+          return;
+        }
+      }
       setError(err.response?.data?.error || err.message || 'An error occurred during authentication.');
     } finally {
       setIsLoading(false);
@@ -187,116 +230,181 @@ export const RoleAuth: React.FC = () => {
 
   return (
     <div className="auth-container">
-      {/* LEFT SIDE: Visual Branding */}
+      {/* LEFT SIDE: Visual Branding Panel (Split Screen) */}
       <div className="auth-branding">
         <div className="branding-content">
-          <div className="branding-logo-wrapper cursor-pointer" onClick={() => navigate('/')}>
+          <div className="branding-logo-wrapper" onClick={() => navigate('/')} role="button" tabIndex={0}>
             <ShieldCheck className="branding-logo" />
             <h1 className="branding-title">Compliance Calculator</h1>
           </div>
           
-          <h2 className="branding-headline">Smarter Compliance. Simplified Audits.</h2>
-          <p className="branding-description">
-            A comprehensive enterprise platform to manage compliance assessments, 
-            streamline audit workflows, and track real-time progress.
-          </p>
+          <div className="branding-hero-block">
+            <h2 className="branding-headline">
+              Smarter Compliance.<br />
+              Simplified Audits.
+            </h2>
+            <p className="branding-description">
+              A comprehensive enterprise platform to manage compliance assessments, 
+              streamline audit workflows, and track real-time progress.
+            </p>
+          </div>
           
-          <div className="auth-illustration">
-            <div className="illust-card illust-card-1">
-              <ShieldAlert className="illust-icon navy" />
-              <div className="illust-lines">
-                <div className="illust-line w-3/4"></div>
-                <div className="illust-line w-1/2"></div>
-              </div>
+          {/* Security & Benefits Information Card */}
+          <div className="branding-footer-card">
+            <div className="security-badge-icon">
+              <Shield className="w-5 h-5 text-white" />
             </div>
-            <div className="illust-card illust-card-2">
-              <CheckSquare className="illust-icon cyan" />
-              <div className="illust-lines">
-                <div className="illust-line w-full"></div>
-                <div className="illust-line w-5/6"></div>
-              </div>
-            </div>
-            <div className="illust-card illust-card-3">
-              <FileSearch className="illust-icon blue" />
-              <div className="illust-lines">
-                <div className="illust-line w-2/3"></div>
-                <div className="illust-line w-1/3"></div>
-              </div>
+            <div className="security-badge-text">
+              <div className="security-badge-title">Secure. Reliable. Compliant.</div>
+              <div className="security-badge-desc">Your data is protected with enterprise-grade security.</div>
             </div>
           </div>
+
+          {/* Carousel / Status Indicator Bars */}
+          <div className="branding-indicators">
+            <span className="indicator-pill active"></span>
+            <span className="indicator-pill"></span>
+            <span className="indicator-pill"></span>
+          </div>
         </div>
-        
-        <div className="auth-bg-blob auth-bg-blob-1"></div>
-        <div className="auth-bg-blob auth-bg-blob-2"></div>
       </div>
 
-      {/* RIGHT SIDE: Form Area */}
+      {/* RIGHT SIDE: Authentication Card */}
       <div className="auth-form-wrapper">
-        <div className="auth-form-card">
+        <div className="auth-card-container">
+          <button 
+            type="button" 
+            onClick={() => navigate('/')} 
+            className="auth-back-btn"
+            title="Back to Home"
+          >
+            <ArrowLeft className="back-icon" />
+            <span>Back to Home</span>
+          </button>
+
+          <div className="auth-form-card">
+          {/* Header */}
           <div className="form-header">
-            <div className="portal-badge mb-4 inline-block bg-[#EAF4FF] text-[#1565C0] px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-[#bfdbfe]">
-              {displayRole} Portal
+            <div className="portal-badge-label">
+              {portalName}
             </div>
             <h2 className="form-title">
-              {isLogin ? `${displayRole} Login` : `Create your ${displayRole} Account`}
+              {activeTab === 'login' ? 'Welcome Back' : `Create your ${displayRole} Account`}
             </h2>
             <p className="form-subtitle">
-              {isLogin 
+              {activeTab === 'login' 
                 ? 'Sign in to access your dashboard.' 
                 : 'Enter your details below to get started.'}
             </p>
           </div>
 
+          {/* Tab Switcher: [ Login ] [ Register ] */}
+          <div className="auth-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'login'}
+              className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
+              onClick={() => switchTab('login')}
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Login</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'register'}
+              className={`auth-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
+              onClick={() => switchTab('register')}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Register</span>
+            </button>
+          </div>
+
+          {/* Alert Messages */}
           {error && (
-            <div className="auth-alert auth-alert-error">
+            <div className="auth-alert auth-alert-error" role="alert">
               <AlertCircle className="alert-icon" />
               <span>{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="auth-alert auth-alert-success">
+            <div className="auth-alert auth-alert-success" role="status">
               <CheckCircle2 className="alert-icon" />
               <span>{success}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="auth-form" autoComplete={isLogin ? "on" : "off"}>
-            {!isLogin && (
+          {infoMessage && (
+            <div className="auth-alert auth-alert-info" role="status">
+              <Info className="alert-icon" />
+              <span>{infoMessage}</span>
+            </div>
+          )}
+
+          {/* Authentication Form with browser autofill prevention */}
+          <form onSubmit={handleSubmit} className="auth-form" autoComplete="off">
+            {/* Decoy fields to intercept aggressive browser credential managers */}
+            <input 
+              type="text" 
+              name="fake_prevent_autofill_user" 
+              style={{ display: 'none' }} 
+              tabIndex={-1} 
+              aria-hidden="true" 
+              autoComplete="off" 
+            />
+            <input 
+              type="password" 
+              name="fake_prevent_autofill_pwd" 
+              style={{ display: 'none' }} 
+              tabIndex={-1} 
+              aria-hidden="true" 
+              autoComplete="new-password" 
+            />
+
+            {activeTab === 'register' && (
               <>
-                {(role === 'admin' || role === 'auditor' || role === 'customer') && (
+                {(canonicalRole === 'admin' || canonicalRole === 'auditor' || canonicalRole === 'customer') && (
                   <div className="input-group">
                     <label>Full Name <span className="required">*</span></label>
                     <div className="input-wrapper">
                       <UserIcon className="input-icon" />
                       <input 
                         type="text" 
+                        name="auth_fullname_input"
                         placeholder="John Doe"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         disabled={isLoading}
+                        autoComplete="off"
+                        required
                       />
                     </div>
                   </div>
                 )}
                 
-                {(role === 'customer' || role === 'vendor') && (
+                {(canonicalRole === 'customer' || canonicalRole === 'vendor') && (
                   <div className="input-group">
-                    <label>{role === 'vendor' ? 'Company / Vendor Name' : 'Company Name'} <span className="required">*</span></label>
+                    <label>{canonicalRole === 'vendor' ? 'Company / Vendor Name' : 'Company Name'} <span className="required">*</span></label>
                     <div className="input-wrapper">
                       <Building2 className="input-icon" />
                       <input 
                         type="text" 
+                        name="auth_company_input"
                         placeholder="Acme Corp"
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         disabled={isLoading}
+                        autoComplete="off"
+                        required
                       />
                     </div>
                   </div>
                 )}
 
-                {role === 'vendor' && (
+                {canonicalRole === 'vendor' && (
                   <>
                     <div className="input-group">
                       <label>Contact Person <span className="required">*</span></label>
@@ -304,10 +412,13 @@ export const RoleAuth: React.FC = () => {
                         <UserIcon className="input-icon" />
                         <input 
                           type="text" 
+                          name="auth_contact_input"
                           placeholder="Jane Smith"
                           value={contactPerson}
                           onChange={(e) => setContactPerson(e.target.value)}
                           disabled={isLoading}
+                          autoComplete="off"
+                          required
                         />
                       </div>
                     </div>
@@ -317,10 +428,13 @@ export const RoleAuth: React.FC = () => {
                         <MapPin className="input-icon" />
                         <input 
                           type="text" 
+                          name="auth_address_input"
                           placeholder="123 Business St, City"
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
                           disabled={isLoading}
+                          autoComplete="off"
+                          required
                         />
                       </div>
                     </div>
@@ -333,113 +447,155 @@ export const RoleAuth: React.FC = () => {
                     <Phone className="input-icon" />
                     <input 
                       type="tel" 
+                      name="auth_phone_input"
                       placeholder="+1 (555) 000-0000"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       disabled={isLoading}
+                      autoComplete="off"
+                      required
                     />
                   </div>
                 </div>
               </>
             )}
 
+            {/* Email field (both Login and Register) */}
             <div className="input-group">
               <label>Email Address <span className="required">*</span></label>
               <div className="input-wrapper">
                 <Mail className="input-icon" />
                 <input 
                   type="email" 
-                  name="email"
+                  name={`auth_email_${activeTab}`}
+                  id={`auth-email-${activeTab}`}
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
-                  autoComplete="email"
+                  autoComplete="off"
+                  readOnly
+                  onFocus={(e) => { e.currentTarget.readOnly = false; }}
+                  required
                 />
               </div>
             </div>
 
+            {/* Password field (both Login and Register) */}
             <div className="input-group">
-              <div className="password-header">
-                <label>Password <span className="required">*</span></label>
-                {isLogin && (
-                  <button type="button" className="forgot-password">
-                    Forgot Password?
-                  </button>
-                )}
-              </div>
+              <label>Password <span className="required">*</span></label>
               <div className="input-wrapper">
                 <Lock className="input-icon" />
                 <input 
                   type={showPassword ? "text" : "password"} 
-                  name="password"
+                  name={`auth_password_${activeTab}`}
+                  id={`auth-password-${activeTab}`}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  autoComplete="new-password"
+                  readOnly
+                  onFocus={(e) => { e.currentTarget.readOnly = false; }}
+                  required
                 />
                 <button 
                   type="button" 
                   className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff /> : <Eye />}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {activeTab === 'login' && (
+                <div className="forgot-password-row">
+                  <button 
+                    type="button" 
+                    className="forgot-password-link"
+                    onClick={handleForgotPassword}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
 
-            {!isLogin && (
+            {/* Confirm Password field (Register only) */}
+            {activeTab === 'register' && (
               <div className="input-group">
                 <label>Confirm Password <span className="required">*</span></label>
                 <div className="input-wrapper">
                   <Lock className="input-icon" />
                   <input 
-                    type={showPassword ? "text" : "password"} 
-                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"} 
+                    name="auth_confirm_password"
+                    id="auth-confirm-password"
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isLoading}
                     autoComplete="new-password"
+                    readOnly
+                    onFocus={(e) => { e.currentTarget.readOnly = false; }}
+                    required
                   />
+                  <button 
+                    type="button" 
+                    className="password-toggle"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
             )}
 
+            {/* Action Submit Button */}
             <button 
               type="submit" 
-              className="auth-submit-btn mt-2"
+              className="auth-submit-btn"
               disabled={isLoading}
             >
               {isLoading ? (
                 <span className="loading-spinner"></span>
               ) : (
                 <>
-                  {isLogin ? 'Sign In' : 'Create Account'}
+                  <span>{activeTab === 'login' ? 'Login to Dashboard' : 'Create Account'}</span>
                   <ArrowRight className="submit-icon" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="auth-footer mt-6 text-center text-sm text-[#475569]">
-            {isLogin ? (
+          {/* Footer Toggle Text */}
+          <div className="auth-footer">
+            {activeTab === 'login' ? (
               <p>
                 Don't have an account?{' '}
-                <button type="button" onClick={toggleMode} className="toggle-link font-bold text-[#1565C0] hover:underline">
-                  Create Account
+                <button 
+                  type="button" 
+                  onClick={() => switchTab('register')} 
+                  className="toggle-link"
+                >
+                  Register
                 </button>
               </p>
             ) : (
               <p>
                 Already have an account?{' '}
-                <button type="button" onClick={toggleMode} className="toggle-link font-bold text-[#1565C0] hover:underline">
+                <button 
+                  type="button" 
+                  onClick={() => switchTab('login')} 
+                  className="toggle-link"
+                >
                   Login
                 </button>
               </p>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -82,77 +82,168 @@ export const AdminCreateAudit: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title="Admin Portal - Create Audit" sidebarItems={sidebarItems}>
-      <div className="max-w-3xl mx-auto db-card">
-        <div className="db-card-header">
-          <h2 className="db-card-title">Create New Audit</h2>
+    <DashboardLayout title="Admin Portal - Create Audit" sidebarItems={sidebarItems} backUrl="/admin/audits" backLabel="Back to Audits">
+      {/* 1. Header */}
+      <div className="admin-page-header">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="admin-header-title">Initiate Compliance Audit</h1>
+            <span className="admin-header-badge">
+              <span className="pulse-dot"></span> Audit Provisioning
+            </span>
+          </div>
+          <p className="admin-header-subtitle">Assign an auditor, select target vendor, bind customer scope, and configure cycle timelines.</p>
         </div>
-        <div className="db-card-body">
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded mb-6 text-sm">{error}</div>}
-          
-          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
-            <div className="db-form-grid">
-              <div>
-                <label className="db-label">Customer *</label>
-                <select required className="db-select" value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})}>
-                  <option value="">Select Customer</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.companyName || c.email}</option>)}
-                </select>
-              </div>
+      </div>
 
-              <div>
-                <label className="db-label">Vendor *</label>
-                <select required className="db-select" value={formData.vendorId} onChange={e => setFormData({...formData, vendorId: e.target.value})}>
-                  <option value="">Select Vendor</option>
-                  {vendors.map(v => <option key={v.id} value={v.id}>{v.companyName || v.email}</option>)}
-                </select>
+      {/* 2. Form Container */}
+      <div className="max-w-3xl mx-auto">
+        <div className="admin-form-card">
+          <div className="admin-form-header">
+            <div className="admin-form-title-wrap">
+              <div className="admin-form-icon-pill">
+                <FileCheck className="w-4 h-4" />
               </div>
-
               <div>
-                <label className="db-label">Auditor *</label>
-                <select required className="db-select" value={formData.auditorId} onChange={e => setFormData({...formData, auditorId: e.target.value})}>
-                  <option value="">Select Auditor</option>
-                  {auditors.map(a => <option key={a.id} value={a.id}>{a.fullName || a.contactPerson || a.email}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="db-label">Audit Period *</label>
-                <select required className="db-select" value={formData.auditPeriod} onChange={e => setFormData({...formData, auditPeriod: e.target.value})}>
-                  <option value="Q1 2026">Q1 2026</option>
-                  <option value="Q2 2026">Q2 2026</option>
-                  <option value="Q3 2026">Q3 2026</option>
-                  <option value="Q4 2026">Q4 2026</option>
-                  <option value="Annual 2026">Annual 2026</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="db-label">Start Date *</label>
-                <input required type="date" className="db-input" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
-              </div>
-
-              <div>
-                <label className="db-label">Due Date *</label>
-                <input required type="date" className="db-input" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
-              </div>
-
-              <div>
-                <label className="db-label">Establishment Type</label>
-                <select required className="db-select" value={formData.establishmentType} onChange={e => setFormData({...formData, establishmentType: e.target.value})}>
-                  <option value="Factory">Factory</option>
-                  <option value="S&E">S&E</option>
-                </select>
+                <h3 className="admin-form-title">Audit Engagement Parameters</h3>
+                <p className="admin-form-subtitle">Configure regulatory parameters before dispatching to the field.</p>
               </div>
             </div>
+            <span className="admin-kpi-badge">New Cycle</span>
+          </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
-              <button type="button" className="db-btn db-btn-outline" onClick={() => navigate('/admin/audits')}>Cancel</button>
-              <button type="submit" disabled={isSubmitting} className="db-btn db-btn-primary">
-                {isSubmitting ? 'Creating...' : 'Create Audit'}
-              </button>
-            </div>
-          </form>
+          <div className="admin-form-body">
+            {error && (
+              <div className="admin-form-error">
+                <span>{error}</span>
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit} autoComplete="off">
+              <div className="admin-form-grid">
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Enterprise Client (Customer) <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select" 
+                    value={formData.customerId} 
+                    onChange={e => setFormData({...formData, customerId: e.target.value})}
+                  >
+                    <option value="">Select Enterprise Client</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{c.companyName || c.email}</option>)}
+                  </select>
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Compliance Auditee (Vendor) <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select" 
+                    value={formData.vendorId} 
+                    onChange={e => setFormData({...formData, vendorId: e.target.value})}
+                  >
+                    <option value="">Select Target Vendor</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.companyName || v.email}</option>)}
+                  </select>
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Assigned Lead Auditor <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select" 
+                    value={formData.auditorId} 
+                    onChange={e => setFormData({...formData, auditorId: e.target.value})}
+                  >
+                    <option value="">Assign Certified Auditor</option>
+                    {auditors.map(a => <option key={a.id} value={a.id}>{a.fullName || a.contactPerson || a.email}</option>)}
+                  </select>
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Audit Cycle Period <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select" 
+                    value={formData.auditPeriod} 
+                    onChange={e => setFormData({...formData, auditPeriod: e.target.value})}
+                  >
+                    <option value="Q1 2026">Q1 2026 (Jan - Mar)</option>
+                    <option value="Q2 2026">Q2 2026 (Apr - Jun)</option>
+                    <option value="Q3 2026">Q3 2026 (Jul - Sep)</option>
+                    <option value="Q4 2026">Q4 2026 (Oct - Dec)</option>
+                    <option value="Annual 2026">Annual Comprehensive 2026</option>
+                  </select>
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Scheduled Start Date <span className="req">*</span>
+                  </label>
+                  <input 
+                    required 
+                    type="date" 
+                    className="admin-form-input" 
+                    value={formData.startDate} 
+                    onChange={e => setFormData({...formData, startDate: e.target.value})} 
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Compliance Due Date <span className="req">*</span>
+                  </label>
+                  <input 
+                    required 
+                    type="date" 
+                    className="admin-form-input" 
+                    value={formData.dueDate} 
+                    onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                  />
+                </div>
+
+                <div className="admin-form-group full-width">
+                  <label className="admin-form-label">
+                    Facility / Establishment Classification <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select" 
+                    value={formData.establishmentType} 
+                    onChange={e => setFormData({...formData, establishmentType: e.target.value})}
+                  >
+                    <option value="Factory">Industrial Factory / Manufacturing Facility</option>
+                    <option value="S&E">Shops & Commercial Establishment (S&E)</option>
+                  </select>
+                </div>
+
+                <div className="admin-form-actions">
+                  <button 
+                    type="button" 
+                    className="db-btn db-btn-outline" 
+                    onClick={() => navigate('/admin/audits')}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting} 
+                    className="db-btn db-btn-primary"
+                  >
+                    {isSubmitting ? 'Provisioning Audit...' : 'Schedule & Dispatch Audit'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </DashboardLayout>
