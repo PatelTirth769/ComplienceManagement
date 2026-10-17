@@ -23,15 +23,53 @@ const VENDOR_TYPES = [
 const otherVendorChecklistPath = path.join(__dirname, '../data/otherVendorChecklist.json');
 const securityVendorChecklistPath = path.join(__dirname, '../data/securityVendorChecklist.json');
 
-let otherVendorChecklist = [];
-let securityVendorChecklist = [];
-
-if (fs.existsSync(otherVendorChecklistPath)) {
-  otherVendorChecklist = JSON.parse(fs.readFileSync(otherVendorChecklistPath, 'utf-8'));
+// Helper function to safely load JSON data without crashing on empty or corrupt files
+function loadJsonSafely(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8').trim();
+      if (raw.length > 0) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[Checklist Warning]: Could not parse JSON from ${filePath}:`, err.message);
+  }
+  return null;
 }
 
-if (fs.existsSync(securityVendorChecklistPath)) {
-  securityVendorChecklist = JSON.parse(fs.readFileSync(securityVendorChecklistPath, 'utf-8'));
+let otherVendorChecklist = loadJsonSafely(otherVendorChecklistPath) || [];
+let securityVendorChecklist = loadJsonSafely(securityVendorChecklistPath) || [];
+
+// Fallback: If either checklist is empty, try to extract from reference Excel files
+if (otherVendorChecklist.length === 0 || securityVendorChecklist.length === 0) {
+  try {
+    const { extractChecklistFromExcel } = require('./excelService');
+    const referenceDir = path.resolve(__dirname, '../../../reference_files');
+
+    if (otherVendorChecklist.length === 0) {
+      const otherExcelPath = path.join(referenceDir, 'Other_Vendor_Audit__Checklist.xls');
+      if (fs.existsSync(otherExcelPath)) {
+        otherVendorChecklist = extractChecklistFromExcel(otherExcelPath, 'OTHER');
+        fs.mkdirSync(path.dirname(otherVendorChecklistPath), { recursive: true });
+        fs.writeFileSync(otherVendorChecklistPath, JSON.stringify(otherVendorChecklist, null, 2), 'utf-8');
+      }
+    }
+
+    if (securityVendorChecklist.length === 0) {
+      const securityExcelPath = path.join(referenceDir, 'Security_Vendor_Audit_Checklist.xls');
+      if (fs.existsSync(securityExcelPath)) {
+        securityVendorChecklist = extractChecklistFromExcel(securityExcelPath, 'SECURITY');
+        fs.mkdirSync(path.dirname(securityVendorChecklistPath), { recursive: true });
+        fs.writeFileSync(securityVendorChecklistPath, JSON.stringify(securityVendorChecklist, null, 2), 'utf-8');
+      }
+    }
+  } catch (err) {
+    console.warn('[Checklist Warning]: Could not auto-extract from Excel files:', err.message);
+  }
 }
 
 /**

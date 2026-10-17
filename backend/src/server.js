@@ -1,9 +1,7 @@
 const path = require('path');
 const config = require('./config');
 const { syncChecklistJsonFiles } = require('./services/excelService');
-const app = require('./app');
-
-// Ensure checklist JSON files are synced from reference Excel files
+// Ensure checklist JSON files are synced from reference Excel files BEFORE app loads
 try {
   const referenceDir = path.resolve(__dirname, '../../reference_files');
   const dataDir = path.resolve(__dirname, './data');
@@ -12,6 +10,8 @@ try {
 } catch (err) {
   console.warn('[Excel Sync Warning]: Could not auto-sync Excel files:', err.message);
 }
+
+const app = require('./app');
 
 const PORT = config.port;
 
