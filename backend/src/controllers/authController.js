@@ -90,14 +90,11 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
-    // Verify Role! Critical requirement
+    // Verify Role
     if (userData.role.toLowerCase() !== role.toLowerCase()) {
-      let actualRoleDisplay = userData.role.charAt(0).toUpperCase() + userData.role.slice(1);
-      let article = (actualRoleDisplay.toLowerCase() === 'admin' || actualRoleDisplay.toLowerCase() === 'auditor') ? 'an' : 'a';
-      
-      return res.status(403).json({ 
+      return res.status(401).json({ 
         success: false, 
-        error: `This account is registered as ${article} ${actualRoleDisplay}. Please use the ${actualRoleDisplay} login.` 
+        error: 'Invalid email or password' 
       });
     }
 

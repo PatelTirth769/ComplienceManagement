@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, ClipboardList, Search, Plus, Loader2 } from 'lucide-react';
+import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, ClipboardList, Search, Plus, Loader2, X, Filter } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
 
@@ -110,113 +110,271 @@ export const AdminChecklist: React.FC = () => {
     return searchMatch && estMatch;
   });
 
+  const activeCount = items.filter(i => i.active !== false).length;
+  const categories = Array.from(new Set(items.map(i => i.type || 'Standard'))).length;
+
   return (
     <DashboardLayout title="Admin Portal - Checklist" sidebarItems={sidebarItems}>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-[#0B1F3A]">Compliance Checklist</h2>
+      {/* 1. Header */}
+      <div className="admin-page-header">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="admin-header-title">Compliance Checklist</h1>
+            <span className="admin-header-badge">
+              <span className="pulse-dot"></span> Statutory Governance
+            </span>
+          </div>
+          <p className="admin-header-subtitle">Standardized regulatory criteria, labour code clauses, and verification rubrics.</p>
+        </div>
         <button className="db-btn db-btn-primary" onClick={() => setIsAdding(!isAdding)}>
-          <Plus className="w-4 h-4 mr-2" /> Add Item
+          <Plus className="w-4 h-4 mr-1" /> Add Criteria Item
         </button>
       </div>
 
-      {isAdding && (
-        <div className="db-card mb-8">
-          <div className="db-card-header">
-            <h3 className="db-card-title">Add Compliance Item</h3>
+      {/* 2. KPI Summary Cards */}
+      <div className="admin-kpi-grid-3col">
+        <div className="admin-kpi-card blue">
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-label">Total Rubrics</span>
+            <div className="admin-kpi-icon-wrapper blue">
+              <ClipboardList className="w-5 h-5" />
+            </div>
           </div>
-          <div className="db-card-body">
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded mb-4 text-sm">{error}</div>}
-            <form onSubmit={handleAddSubmit} className="db-form-grid" autoComplete="off">
+          <div className="admin-kpi-value">{items.length}</div>
+          <span className="admin-kpi-subtext">Statutory clauses mapped</span>
+          <span className="admin-kpi-badge">Standard Library</span>
+        </div>
+
+        <div className="admin-kpi-card emerald">
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-label">Active Clauses</span>
+            <div className="admin-kpi-icon-wrapper emerald">
+              <FileCheck className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="admin-kpi-value">{activeCount}</div>
+          <span className="admin-kpi-subtext">Currently enforced in audits</span>
+          <span className="admin-kpi-badge">Enforced</span>
+        </div>
+
+        <div className="admin-kpi-card cyan">
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-label">Frameworks</span>
+            <div className="admin-kpi-icon-wrapper cyan">
+              <Building2 className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="admin-kpi-value">{categories} Standards</div>
+          <span className="admin-kpi-subtext">Labour code & security acts</span>
+          <span className="admin-kpi-badge">Verified</span>
+        </div>
+      </div>
+
+      {/* Add Item Modal / Card */}
+      {isAdding && (
+        <div className="admin-form-card">
+          <div className="admin-form-header">
+            <div className="admin-form-title-wrap">
+              <div className="admin-form-icon-pill">
+                <ClipboardList className="w-4 h-4" />
+              </div>
               <div>
-                <label className="db-label">Establishment Type *</label>
-                <select required className="db-select" value={formData.vendorType} onChange={e => setFormData({...formData, vendorType: e.target.value})}>
+                <h3 className="admin-form-title">Add New Compliance Requirement</h3>
+                <p className="admin-form-subtitle">Register a standardized statutory audit rubric or inspection clause.</p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setIsAdding(false)} 
+              className="admin-form-close-btn"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="admin-form-body">
+            {error && (
+              <div className="admin-form-error">
+                <span>{error}</span>
+              </div>
+            )}
+            
+            <form onSubmit={handleAddSubmit} autoComplete="off" className="admin-form-grid">
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Establishment Type <span className="req">*</span>
+                </label>
+                <select 
+                  required 
+                  className="admin-form-select" 
+                  value={formData.vendorType} 
+                  onChange={e => setFormData({...formData, vendorType: e.target.value})}
+                >
                   <option value="other-vendor">Other Vendor</option>
                   <option value="security-vendor">Security Vendor</option>
                 </select>
               </div>
-              <div>
-                <label className="db-label">Labour Code / Act *</label>
-                <input required className="db-input" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} />
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Labour Code / Act <span className="req">*</span>
+                </label>
+                <input 
+                  required 
+                  className="admin-form-input" 
+                  placeholder="e.g. CL Act, EPF, ESI" 
+                  value={formData.type} 
+                  onChange={e => setFormData({...formData, type: e.target.value})} 
+                />
               </div>
-              <div>
-                <label className="db-label">Title *</label>
-                <input required className="db-input" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Clause Title <span className="req">*</span>
+                </label>
+                <input 
+                  required 
+                  className="admin-form-input" 
+                  placeholder="e.g. Registration Certificate" 
+                  value={formData.title} 
+                  onChange={e => setFormData({...formData, title: e.target.value})} 
+                />
               </div>
-              <div>
-                <label className="db-label">ID Code</label>
-                <input className="db-input" placeholder="Auto-generated if empty" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} />
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">
+                  Clause ID Code (Optional)
+                </label>
+                <input 
+                  className="admin-form-input" 
+                  placeholder="Auto-generated if empty" 
+                  value={formData.id} 
+                  onChange={e => setFormData({...formData, id: e.target.value})} 
+                />
               </div>
-              <div className="md:col-span-2">
-                <label className="db-label">Requirement *</label>
-                <textarea required className="db-input" rows={2} value={formData.statutoryRequirement} onChange={e => setFormData({...formData, statutoryRequirement: e.target.value})} />
+
+              <div className="admin-form-group full-width">
+                <label className="admin-form-label">
+                  Statutory Requirement Particulars <span className="req">*</span>
+                </label>
+                <textarea 
+                  required 
+                  className="admin-form-textarea" 
+                  rows={3} 
+                  placeholder="Detailed legal compliance requirement particulars..." 
+                  value={formData.statutoryRequirement} 
+                  onChange={e => setFormData({...formData, statutoryRequirement: e.target.value})} 
+                />
               </div>
-              <div className="md:col-span-2 flex justify-end gap-2 mt-4">
-                <button type="button" className="db-btn db-btn-outline" onClick={() => setIsAdding(false)}>Cancel</button>
-                <button type="submit" className="db-btn db-btn-primary">Save Item</button>
+
+              <div className="admin-form-actions">
+                <button type="button" className="db-btn db-btn-outline text-xs" onClick={() => setIsAdding(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="db-btn db-btn-primary text-xs">
+                  Save Requirement
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* Main Table Card */}
       <div className="db-card">
-        <div className="db-card-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex gap-4 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search compliance requirement..." 
-                className="pl-9 pr-4 py-2 border rounded-md w-full text-sm"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+        <div className="table-toolbar">
+          <div className="search-input-wrapper">
+            <Search className="search-input-icon" />
+            <input 
+              type="text" 
+              placeholder="Search compliance requirements or codes..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="filter-dropdown-wrapper">
+              <Filter className="filter-dropdown-icon" />
+              <select 
+                className="filter-dropdown-select"
+                value={establishmentFilter}
+                onChange={e => setEstablishmentFilter(e.target.value)}
+              >
+                <option value="All">All Categories ({items.length})</option>
+                <option value="Other Vendor">Other Vendor</option>
+                <option value="Security Vendor">Security Vendor</option>
+              </select>
             </div>
-            <select 
-              className="border rounded-md px-3 py-2 text-sm"
-              value={establishmentFilter}
-              onChange={e => setEstablishmentFilter(e.target.value)}
-            >
-              <option value="All">All Establishments</option>
-              <option value="Other Vendor">Other Vendor</option>
-              <option value="Security Vendor">Security Vendor</option>
-            </select>
+            <span className="text-xs text-slate-500 font-semibold hidden md:inline">
+              Showing {filtered.length} of {items.length}
+            </span>
           </div>
         </div>
-        <div className="db-table-wrapper">
-          <table className="db-table">
+
+        <div className="table-responsive">
+          <table className="enterprise-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th>Code ID</th>
                 <th>Establishment</th>
-                <th>Code / Act</th>
-                <th>Title / Requirement</th>
+                <th>Labour Code / Act</th>
+                <th>Requirement Details</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th className="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8"><Loader2 className="animate-spin w-6 h-6 mx-auto text-[#1565C0]" /></td></tr>
+                <tr>
+                  <td colSpan={6} className="text-center py-12">
+                    <Loader2 className="animate-spin w-8 h-8 mx-auto text-[#1565C0]" />
+                  </td>
+                </tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-gray-500">No checklist items found</td></tr>
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-slate-500">
+                    <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="font-bold text-slate-700">No compliance items found</p>
+                    <p className="text-xs text-slate-400 mt-1">Try clearing your filters or create a new requirement.</p>
+                  </td>
+                </tr>
               ) : (
                 filtered.map(i => (
-                  <tr key={i.id} className={i.active === false ? 'opacity-50' : ''}>
-                    <td className="font-semibold text-xs text-[#0B1F3A]">{i.id}</td>
-                    <td className="text-xs">{i.vendorCategory}</td>
-                    <td className="text-xs">{i.type}</td>
+                  <tr key={i.id} className={i.active === false ? 'opacity-60 bg-slate-50/50' : ''}>
                     <td>
-                      <div className="font-semibold text-sm">{i.title}</div>
-                      <div className="text-xs text-gray-500 truncate max-w-xs">{i.statutoryRequirement}</div>
+                      <span className="audit-id-badge">{i.id}</span>
                     </td>
                     <td>
-                      {i.active !== false 
-                        ? <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">Active</span> 
-                        : <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-bold">Inactive</span>}
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                        {i.vendorCategory}
+                      </span>
                     </td>
                     <td>
-                      <button onClick={() => handleToggleStatus(i)} className="db-btn db-btn-outline text-xs py-1 px-2">
+                      <span className="font-bold text-xs text-slate-800 bg-blue-50/80 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
+                        {i.type}
+                      </span>
+                    </td>
+                    <td className="max-w-md">
+                      <div className="font-bold text-sm text-slate-900">{i.title}</div>
+                      <div className="text-xs text-slate-500 line-clamp-2 mt-0.5">{i.statutoryRequirement}</div>
+                    </td>
+                    <td>
+                      {i.active !== false ? (
+                        <span className="db-badge completed">
+                          <span className="db-badge-dot"></span> Active
+                        </span>
+                      ) : (
+                        <span className="db-badge scheduled">
+                          <span className="db-badge-dot"></span> Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      <button 
+                        onClick={() => handleToggleStatus(i)} 
+                        className={`db-btn text-xs py-1 px-3 ${i.active !== false ? 'db-btn-outline text-amber-600 border-amber-300 hover:bg-amber-50' : 'db-btn-primary'}`}
+                      >
                         {i.active !== false ? 'Deactivate' : 'Activate'}
                       </button>
                     </td>

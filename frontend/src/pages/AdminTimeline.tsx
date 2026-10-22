@@ -97,7 +97,7 @@ export const AdminTimeline: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
-                      Vendor ID: <strong className="text-slate-700">{audit.vendorId}</strong> • Customer ID: <strong className="text-slate-700">{audit.customerId}</strong>
+                      Vendor: <strong className="text-slate-700">{audit.vendorName || audit.vendorId}</strong> • Customer: <strong className="text-slate-700">{audit.customerName || audit.customerId}</strong>
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

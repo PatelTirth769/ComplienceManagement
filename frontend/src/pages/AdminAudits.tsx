@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FileCheck, Plus, Search, Loader2, Trash2, AlertTriangle, CheckCircle2, FileSpreadsheet } from 'lucide-react';
+import { FileCheck, Plus, Search, Loader2, Trash2, AlertTriangle, CheckCircle2, FileSpreadsheet, Filter, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
@@ -118,98 +118,133 @@ export const AdminAudits: React.FC = () => {
 
   return (
     <DashboardLayout title="Admin Portal - Audits" sidebarItems={sidebarItems}>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-[#0B1F3A]">Audits</h2>
+      {/* 1. Page Header */}
+      <div className="admin-page-header">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="admin-header-title">Audit Management</h1>
+            <span className="admin-header-badge">
+              <span className="pulse-dot"></span> Active Governance
+            </span>
+          </div>
+          <p className="admin-header-subtitle">Monitor compliance schedules, field auditor submissions, and sign-offs.</p>
+        </div>
         <Link to="/admin/audits/create" className="db-btn db-btn-primary">
-          <Plus className="w-4 h-4 mr-2" /> Create Audit
+          <Plus className="w-4 h-4 mr-1" /> Create Audit
         </Link>
       </div>
 
       {toastMessage && (
-        <div className={`mb-4 p-3.5 rounded-lg text-xs font-bold flex items-center gap-2 border ${
+        <div className={`mb-4 p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 border shadow-sm ${
           toastMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
         }`}>
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
           <span>{toastMessage.text}</span>
         </div>
       )}
 
+      {/* 2. Main Table Card */}
       <div className="db-card">
-        <div className="db-card-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex gap-4 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search Audit ID, Period..." 
-                className="pl-9 pr-4 py-2 border rounded-md w-full text-sm"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+        <div className="table-toolbar">
+          <div className="search-input-wrapper">
+            <Search className="search-input-icon" />
+            <input 
+              type="text" 
+              placeholder="Search by Audit ID, Period..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Status Filter Dropdown */}
+          <div className="flex items-center gap-3">
+            <div className="filter-dropdown-wrapper">
+              <Filter className="filter-dropdown-icon" />
+              <select 
+                className="filter-dropdown-select"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="All">All Statuses ({audits.length})</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Pending Sign-off">Pending Sign-off</option>
+                <option value="Closed">Closed</option>
+              </select>
             </div>
-            <select 
-              className="border rounded-md px-3 py-2 text-sm"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Statuses</option>
-              <option value="Scheduled">Scheduled</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Pending Sign-off">Pending Sign-off</option>
-              <option value="Approved">Approved</option>
-              <option value="Closed">Closed</option>
-            </select>
+            <span className="text-xs text-slate-500 font-semibold hidden md:inline">
+              Showing {filtered.length} of {audits.length}
+            </span>
           </div>
         </div>
+
         <div className="db-table-wrapper">
-          <table className="db-table">
+          <table className="enterprise-table">
             <thead>
               <tr>
                 <th>Audit ID</th>
                 <th>Period</th>
-                <th>Dates</th>
+                <th>Audit Timeline</th>
                 <th>Status</th>
                 <th>Score</th>
-                <th>Actions</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8"><Loader2 className="animate-spin w-6 h-6 mx-auto text-[#1565C0]" /></td></tr>
+                <tr><td colSpan={6} className="text-center py-12"><Loader2 className="animate-spin w-6 h-6 mx-auto text-[#0B63E5]" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-gray-500">No audits available</td></tr>
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                    <FileCheck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <p className="text-xs font-semibold text-slate-500">No audits found matching current filter</p>
+                  </td>
+                </tr>
               ) : (
                 filtered.map(a => {
                   const is100Percent = a.completionPercentage === 100 || ['closed', 'completed', 'approved'].includes((a.status || '').toLowerCase());
                   return (
                     <tr key={a.id}>
-                      <td className="font-semibold text-[#0B1F3A]">{a.auditIdString}</td>
-                      <td>{a.auditPeriod}</td>
-                      <td className="text-sm">
+                      <td>
+                        <span className="audit-id-badge">{a.auditIdString}</span>
+                      </td>
+                      <td className="font-semibold text-slate-800">{a.auditPeriod}</td>
+                      <td className="text-xs font-medium text-slate-600">
                         {new Date(a.startDate).toLocaleDateString()} - {new Date(a.dueDate).toLocaleDateString()}
                       </td>
                       <td>{getStatusBadge(a.status)}</td>
-                      <td className="font-bold">{a.score ? `${a.score}%` : <span className="text-gray-400 font-normal">N/A</span>}</td>
                       <td>
-                        <div className="flex items-center gap-1.5">
-                          <Link to={`/admin/audits/${a.id}`} className="db-btn db-btn-outline text-xs py-1 px-2.5">View</Link>
+                        {a.score !== null ? (
+                          <span className={`score-badge-pill ${a.score >= 80 ? 'high' : a.score >= 50 ? 'medium' : 'low'}`}>
+                            {a.score}%
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic font-medium">N/A</span>
+                        )}
+                      </td>
+                      <td className="text-right">
+                        <div className="table-action-cluster">
+                          <Link to={`/admin/audits/${a.id}`} className="btn-action-view" title="View Audit Details">
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
+                          </Link>
                           
                           {is100Percent ? (
                             <button 
                               onClick={() => handleDownloadExcel(a)}
-                              className="db-btn text-xs py-1 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                              className="btn-action-excel"
                               title="Download Complete Excel Workbook"
                             >
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
                               <span>Excel</span>
                             </button>
                           ) : (
                             <button 
                               disabled
-                              className="db-btn text-xs py-1 px-2.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-md font-medium cursor-not-allowed opacity-60 flex items-center gap-1"
-                              title="Excel download available after audit completion."
+                              className="btn-action-excel"
+                              title="Excel download available after audit completion"
                             >
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
                               <span>Excel</span>
                             </button>
                           )}

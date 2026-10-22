@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuditProvider } from './context/AuditContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -43,7 +43,7 @@ import { useAuth } from './context/AuthContext';
 
 // A wrapper for the Calculator to include the Header with Logout
 import { UserHeaderMenu } from './components/UserHeaderMenu';
-import { ShieldCheck, Search, Bell } from 'lucide-react';
+import { ShieldCheck, Search, Bell, ArrowLeft } from 'lucide-react';
 import './components/DashboardLayout.css'; // Import the new styles
 
 const CalculatorWithHeader = () => {
@@ -65,10 +65,6 @@ const CalculatorWithHeader = () => {
         </div>
 
         <div className="header-right">
-          <button className="icon-btn">
-            <Bell className="h-5 w-5" />
-            <span className="notification-dot"></span>
-          </button>
           <UserHeaderMenu portalTitle="Auditor Portal" />
         </div>
       </header>

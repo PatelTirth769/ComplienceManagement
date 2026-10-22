@@ -106,7 +106,7 @@ export const CustomerDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} hideBackButton={true}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
           <div style={{
             width: '42px', height: '42px', border: '3px solid #EFF6FF',
@@ -119,7 +119,7 @@ export const CustomerDashboard: React.FC = () => {
   }
 
   return (
-    <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
+    <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} hideBackButton={true}>
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
         .customer-card {

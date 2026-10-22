@@ -107,7 +107,7 @@ export const CustomerAuditDetails: React.FC = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
+      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} hideBackButton={true}>
         <div style={{ padding: '4rem', textAlign: 'center' }}>
           <div style={{
             width: '40px', height: '40px', border: '3px solid #EFF6FF',
@@ -122,13 +122,7 @@ export const CustomerAuditDetails: React.FC = () => {
 
   if (error || !audit) {
     return (
-      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
-        <div style={{ marginBottom: '1rem' }}>
-          <Link to="/customer/audits" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#1565C0', textDecoration: 'none', fontWeight: 700, fontSize: '0.8375rem' }}>
-            <ArrowLeft style={{ width: '16px', height: '16px' }} />
-            Back to Audits
-          </Link>
-        </div>
+      <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} backUrl="/customer/audits" backLabel="Back to Audits">
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '14px', padding: '3rem 2rem', textAlign: 'center' }}>
           <AlertCircle style={{ width: '40px', height: '40px', color: '#DC2626', margin: '0 auto 0.75rem' }} />
           <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#991B1B', margin: '0 0 0.5rem' }}>Unable to load audit details</h3>
@@ -153,7 +147,7 @@ export const CustomerAuditDetails: React.FC = () => {
   const findings = audit.nonCompliantItems || [];
 
   return (
-    <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
+    <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems} backUrl="/customer/audits" backLabel="Back to Audits">
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
         .audit-details-card {
@@ -165,14 +159,6 @@ export const CustomerAuditDetails: React.FC = () => {
           margin-bottom: 1.5rem;
         }
       `}</style>
-
-      {/* Top Navigation */}
-      <div style={{ marginBottom: '1.25rem', animation: 'fadeIn 0.3s ease' }}>
-        <Link to="/customer/audits" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', color: '#1565C0', textDecoration: 'none', fontWeight: 700, fontSize: '0.8375rem' }}>
-          <ArrowLeft style={{ width: '16px', height: '16px' }} />
-          Back to Audits
-        </Link>
-      </div>
 
       {/* Header Banner */}
       <div className="audit-details-card" style={{ padding: '1.25rem 1.5rem', animation: 'fadeIn 0.3s ease 0.05s both' }}>

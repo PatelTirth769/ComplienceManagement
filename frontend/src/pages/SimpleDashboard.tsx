@@ -1,7 +1,8 @@
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, LogOut } from 'lucide-react';
+import { ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
+import '../components/DashboardLayout.css';
 
 export const SimpleDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -9,6 +10,10 @@ export const SimpleDashboard: React.FC = () => {
 
   const handleLogout = () => {
     logout();
+    navigate('/');
+  };
+
+  const handleBack = () => {
     navigate('/');
   };
 
@@ -39,7 +44,16 @@ export const SimpleDashboard: React.FC = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <button 
+          type="button" 
+          onClick={handleBack} 
+          className="dashboard-content-back-btn mb-4"
+          title="Back"
+        >
+          <ArrowLeft className="back-icon" />
+          <span>Back</span>
+        </button>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <h1 className="text-2xl font-bold text-[#0B1F3A] mb-4">
             Welcome to the {user?.role} Dashboard
