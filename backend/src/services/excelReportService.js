@@ -93,7 +93,7 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
   // SHEET 2 — Compliance Checklist
   // ----------------------------------------------------
   const vendorType = audit.vendorType || 'other-vendor';
-  const checklist = checklistService.getChecklistByVendorType(vendorType) || [];
+  const checklist = checklistService.getChecklistByVendorType(vendorType, { state: audit.state, country: audit.country }) || [];
   
   // Normalize responses into map
   const respMap = {};

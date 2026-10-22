@@ -32,6 +32,8 @@ function getVendorTypes(req, res) {
 function getTemplate(req, res) {
   const { vendorType } = req.params;
 
+  const { state, country } = req.query;
+
   if (!checklistService.isValidVendorType(vendorType)) {
     return res.status(404).json({
       success: false,
@@ -43,11 +45,13 @@ function getTemplate(req, res) {
   }
 
   const normalizedVendorType = checklistService.normalizeVendorType(vendorType);
-  const checklist = checklistService.getChecklistByVendorType(vendorType);
+  const checklist = checklistService.getChecklistByVendorType(vendorType, { state, country }) || [];
 
   return res.status(200).json({
     success: true,
     vendorType: normalizedVendorType,
+    country: country || 'India',
+    state: state || 'All',
     totalItems: checklist.length,
     checklist: checklist
   });
@@ -58,7 +62,7 @@ function getTemplate(req, res) {
  */
 function calculateScore(req, res, next) {
   try {
-    const { vendorType, responses } = req.body || {};
+    const { vendorType, responses, state, country } = req.body || {};
 
     if (!vendorType || !checklistService.isValidVendorType(vendorType)) {
       return res.status(400).json({
@@ -70,7 +74,7 @@ function calculateScore(req, res, next) {
       });
     }
 
-    const checklist = checklistService.getChecklistByVendorType(vendorType);
+    const checklist = checklistService.getChecklistByVendorType(vendorType, { state, country }) || [];
     const normalizedVendorType = checklistService.normalizeVendorType(vendorType);
 
     const calculationResult = scoringService.calculateComplianceScore(checklist, responses);
@@ -78,6 +82,8 @@ function calculateScore(req, res, next) {
     return res.status(200).json({
       success: true,
       vendorType: normalizedVendorType,
+      country: country || 'India',
+      state: state || 'All',
       summary: calculationResult.summary,
       categoryScores: calculationResult.categoryScores,
       nonCompliantItems: calculationResult.nonCompliantItems
@@ -103,7 +109,9 @@ async function createAudit(req, res, next) {
       auditor,
       vendorRepresentative,
       clientRepresentative,
-      employeeCount
+      employeeCount,
+      state,
+      country
     } = req.body || {};
 
     if (!vendorType || !checklistService.isValidVendorType(vendorType)) {
@@ -116,7 +124,7 @@ async function createAudit(req, res, next) {
       });
     }
 
-    const checklist = checklistService.getChecklistByVendorType(vendorType);
+    const checklist = checklistService.getChecklistByVendorType(vendorType, { state, country }) || [];
     const normalizedVendorType = checklistService.normalizeVendorType(vendorType);
 
     const calculationResult = scoringService.calculateComplianceScore(checklist, responses);
@@ -184,6 +192,8 @@ async function createAudit(req, res, next) {
         vendorRepresentative: vendorRepresentative || existingData.vendorRepresentative || '',
         clientRepresentative: clientRepresentative || existingData.clientRepresentative || '',
         employeeCount: employeeCount || existingData.employeeCount || null,
+        country: country || existingData.country || 'India',
+        state: state || existingData.state || 'N/A',
         vendorType: normalizedVendorType,
         summary: calculationResult.summary,
         categoryScores: calculationResult.categoryScores,
@@ -214,6 +224,8 @@ async function createAudit(req, res, next) {
         vendorRepresentative,
         clientRepresentative,
         employeeCount,
+        country: country || 'India',
+        state: state || 'N/A',
         vendorType: normalizedVendorType,
         summary: calculationResult.summary,
         categoryScores: calculationResult.categoryScores,
@@ -319,7 +331,9 @@ async function downloadExcel(req, res, next) {
       vendorRepresentative,
       clientRepresentative,
       employeeCount,
-      auditId
+      auditId,
+      state,
+      country
     } = req.body || {};
 
     const targetVendorType = vendorType || 'other-vendor';
@@ -333,7 +347,7 @@ async function downloadExcel(req, res, next) {
       });
     }
 
-    const checklist = checklistService.getChecklistByVendorType(targetVendorType);
+    const checklist = checklistService.getChecklistByVendorType(targetVendorType, { state, country }) || [];
     const normalizedVendorType = checklistService.normalizeVendorType(targetVendorType);
 
     // Calculate score using existing scoring engine (single source of truth)
@@ -352,6 +366,8 @@ async function downloadExcel(req, res, next) {
       vendorRepresentative: vendorRepresentative || '',
       clientRepresentative: clientRepresentative || '',
       employeeCount: employeeCount || '',
+      country: country || 'India',
+      state: state || 'N/A',
       vendorType: normalizedVendorType,
       summary: calculationResult.summary,
       categoryScores: calculationResult.categoryScores,

@@ -210,7 +210,7 @@ exports.getAuditById = async (req, res) => {
     if ((!fullData.categoryScores || fullData.categoryScores.length === 0 || !fullData.critical) && fullData.responses && Array.isArray(fullData.responses) && fullData.responses.length > 0) {
       try {
         const vendorType = fullData.vendorType || 'other-vendor';
-        const checklist = checklistService.getChecklistByVendorType(vendorType) || checklistService.getChecklistByVendorType('other-vendor');
+        const checklist = checklistService.getChecklistByVendorType(vendorType, { state: fullData.state, country: fullData.country }) || checklistService.getChecklistByVendorType('other-vendor');
         if (checklist) {
           const calcResult = scoringService.calculateComplianceScore(checklist, fullData.responses);
           fullData.summary = calcResult.summary;
@@ -588,7 +588,7 @@ exports.downloadReport = async (req, res) => {
     // Ensure score breakdown is calculated for PDF
     if ((!auditData.categoryScores || auditData.categoryScores.length === 0 || !auditData.critical) && auditData.responses && Array.isArray(auditData.responses)) {
       try {
-        const checklist = checklistService.getChecklistByVendorType(auditData.vendorType || 'other-vendor') || checklistService.getChecklistByVendorType('other-vendor');
+        const checklist = checklistService.getChecklistByVendorType(auditData.vendorType || 'other-vendor', { state: auditData.state, country: auditData.country }) || checklistService.getChecklistByVendorType('other-vendor');
         if (checklist) {
           const calcResult = scoringService.calculateComplianceScore(checklist, auditData.responses);
           auditData.summary = calcResult.summary;

@@ -5,7 +5,8 @@ const checklistService = require('../services/checklistService');
 // Checklist Management
 exports.getChecklists = async (req, res) => {
   try {
-    const all = checklistService.getAllChecklists();
+    const { state, country } = req.query;
+    const all = checklistService.getAllChecklists({ state, country });
     res.status(200).json({ success: true, data: all });
   } catch (error) {
     console.error('getChecklists error:', error);
@@ -288,7 +289,7 @@ exports.getAudits = async (req, res) => {
 exports.createAudit = async (req, res) => {
   try {
     const db = getDb();
-    const { customerId, vendorId, auditorId, auditPeriod, startDate, dueDate, establishmentType, ...otherInfo } = req.body;
+    const { customerId, vendorId, auditorId, auditPeriod, startDate, dueDate, establishmentType, country, state, ...otherInfo } = req.body;
 
     if (!customerId || !vendorId || !auditorId || !auditPeriod || !startDate || !dueDate) {
       return res.status(400).json({ success: false, error: 'Missing required audit fields' });
@@ -347,6 +348,8 @@ exports.createAudit = async (req, res) => {
       startDate,
       dueDate,
       establishmentType: establishmentType || '',
+      country: country || 'India',
+      state: state || 'N/A',
       status: 'Scheduled',
       createdAt: new Date().toISOString(),
       score: null,
@@ -521,7 +524,7 @@ exports.getAuditById = async (req, res) => {
     if ((!summary.compliantItems || nonCompliantItems.length === 0) && auditData.responses) {
       try {
         const vendorType = auditData.vendorType || 'other-vendor';
-        const checklist = checklistService.getChecklistByVendorType(vendorType) || checklistService.getChecklistByVendorType('other-vendor') || [];
+        const checklist = checklistService.getChecklistByVendorType(vendorType, { state: auditData.state, country: auditData.country }) || checklistService.getChecklistByVendorType('other-vendor') || [];
         
         let respArray = [];
         if (Array.isArray(auditData.responses)) {

@@ -1,5 +1,18 @@
 export type ComplianceStatus = 'COMPLIANT' | 'NON_COMPLIANT' | 'NA';
 
+export const SUPPORTED_STATES = [
+  'All',
+  'N/A',
+  'Maharashtra',
+  'Haryana',
+  'Telangana',
+  'Karnataka',
+  'Madhya Pradesh',
+  'Uttar Pradesh'
+] as const;
+
+export type SupportedState = typeof SUPPORTED_STATES[number];
+
 export interface VendorType {
   id: string;
   code: string;
@@ -14,6 +27,30 @@ export interface ChecklistItem {
   type: string;
   particulars: string;
   statutoryRequirement: string;
+  country?: string;
+  state?: string;
+  vendorCategory?: string;
+  slNo?: number;
+  nameOfAct?: string;
+  actNameInShort?: string;
+  formNo?: string;
+  description?: string;
+  natureOfRegister?: string;
+  classifications?: string;
+  periodicity?: string;
+  applicableStates?: string[];
+  isConsolidated?: boolean;
+  duplicateCount?: number;
+  active?: boolean;
+  'Sl.No'?: number;
+  'State'?: string;
+  'Name of the Act'?: string;
+  'Act Name in Short'?: string;
+  'Form No.'?: string;
+  'Description'?: string;
+  'Nature of Register'?: string;
+  'Classifications'?: string;
+  'Periodicity'?: string;
 }
 
 export interface ComplianceResponse {
@@ -33,6 +70,8 @@ export interface AuditInformation {
   clientRepresentative: string;
   employeeCount: number | '';
   vendorType: string;
+  country?: string;
+  state?: string;
 }
 
 export interface CalculationSummary {
@@ -69,6 +108,8 @@ export interface NonCompliantItemDetail {
 export interface CalculationResult {
   success: boolean;
   vendorType: string;
+  country?: string;
+  state?: string;
   summary: CalculationSummary;
   categoryScores: CategoryScore[];
   nonCompliantItems: NonCompliantItemDetail[];

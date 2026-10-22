@@ -8,6 +8,10 @@ export const AuditInformation: React.FC = () => {
     vendorTypes,
     selectedVendorType,
     setSelectedVendorType,
+    selectedState,
+    setSelectedState,
+    selectedCountry,
+    setSelectedCountry,
     auditInfo,
     updateAuditInfo,
     loadingVendorTypes,
@@ -37,6 +41,8 @@ export const AuditInformation: React.FC = () => {
     if (!audit) return;
     setSelectedAuditId(audit.id);
     if (audit.vendorType) setSelectedVendorType(audit.vendorType);
+    if (audit.country) setSelectedCountry(audit.country);
+    if (audit.state) setSelectedState(audit.state);
     updateAuditInfo('organisation', audit.customerName || audit.organisation || audit.customer || '');
     updateAuditInfo('site', audit.site || 'Main Facility');
     updateAuditInfo('auditMonth', audit.auditPeriod || audit.auditMonth || '');
@@ -116,6 +122,51 @@ export const AuditInformation: React.FC = () => {
           ) : (
             <p className="form-help">Selecting a vendor type dynamically loads the appropriate compliance checklist.</p>
           )}
+        </div>
+
+        {/* Country & State Fields */}
+        <div className="form-group">
+          <label className="form-label font-semibold" htmlFor="auditCountry">
+            Country <span className="text-danger">*</span>
+          </label>
+          <div className="input-prefix-wrapper">
+            <MapPin className="input-icon text-[#1565C0]" />
+            <select
+              id="auditCountry"
+              className="form-control font-semibold bg-slate-50 text-slate-800"
+              value={selectedCountry}
+              onChange={e => setSelectedCountry(e.target.value)}
+              disabled
+            >
+              <option value="India">🇮🇳 India</option>
+            </select>
+          </div>
+          <p className="form-help">Country is set to India for statutory vendor audit checklists.</p>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label font-bold text-[#1565C0]" htmlFor="auditState">
+            State Jurisdiction <span className="text-danger">*</span>
+          </label>
+          <div className="input-prefix-wrapper">
+            <MapPin className="input-icon text-[#1565C0]" />
+            <select
+              id="auditState"
+              className="form-control font-semibold border-blue-200 text-[#0B1F3A]"
+              value={selectedState}
+              onChange={e => setSelectedState(e.target.value)}
+            >
+              <option value="All">All (Consolidated States)</option>
+              <option value="N/A">N/A (General / Unassigned)</option>
+              <option value="Maharashtra">Maharashtra</option>
+              <option value="Haryana">Haryana</option>
+              <option value="Telangana">Telangana</option>
+              <option value="Karnataka">Karnataka</option>
+              <option value="Madhya Pradesh">Madhya Pradesh</option>
+              <option value="Uttar Pradesh">Uttar Pradesh</option>
+            </select>
+          </div>
+          <p className="form-help">Select a specific Indian state to apply state-specific checklists, or All for combined.</p>
         </div>
 
         {/* Organisation */}

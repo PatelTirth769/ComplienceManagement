@@ -38,18 +38,31 @@ export async function getVendorTypes(): Promise<VendorType[]> {
 }
 
 /**
- * Fetch checklist template for vendor type
+ * Fetch checklist template for vendor type with optional state and country
  */
-export async function getChecklist(vendorType: string): Promise<{ totalItems: number; checklist: ChecklistItem[] }> {
+export async function getChecklist(
+  vendorType: string,
+  state?: string,
+  country?: string
+): Promise<{ totalItems: number; checklist: ChecklistItem[]; state?: string; country?: string }> {
+  const params = new URLSearchParams();
+  if (state) params.set('state', state);
+  if (country) params.set('country', country);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
   const response = await api.get<{
     success: boolean;
     vendorType: string;
     totalItems: number;
     checklist: ChecklistItem[];
-  }>(`/compliance/templates/${vendorType}`);
+    state?: string;
+    country?: string;
+  }>(`/compliance/templates/${vendorType}${qs}`);
   return {
     totalItems: response.data.totalItems,
-    checklist: response.data.checklist
+    checklist: response.data.checklist,
+    state: response.data.state,
+    country: response.data.country
   };
 }
 
@@ -59,6 +72,8 @@ export async function getChecklist(vendorType: string): Promise<{ totalItems: nu
 export async function calculateCompliance(payload: {
   vendorType: string;
   responses: ComplianceResponse[];
+  state?: string;
+  country?: string;
 }): Promise<CalculationResult> {
   const response = await api.post<CalculationResult>('/compliance/calculate', payload);
   return response.data;
