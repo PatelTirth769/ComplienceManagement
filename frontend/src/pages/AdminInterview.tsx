@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
-import { 
-  Users, CheckCircle2, Trash2, Plus, Loader2, 
-  MessageSquareQuote, Building2, Calendar, AlertCircle, 
+import {
+  Users, CheckCircle2, Trash2, Plus, Loader2,
+  MessageSquareQuote, Building2, Calendar, AlertCircle,
   FileCheck, Check, Sparkles, HelpCircle, FileText,
   Paperclip, ExternalLink
 } from 'lucide-react';
@@ -37,7 +37,7 @@ export const AdminInterview: React.FC = () => {
       const res = await getAdminAudits();
       if (res.success && Array.isArray(res.audits) && res.audits.length > 0) {
         setAudits(res.audits);
-        
+
         // Pick preferred audit if specified, or existing selectedAuditId, or audit with interviewResources, or first audit
         const targetId = preferredAuditId || selectedAuditId;
         let chosen = targetId ? res.audits.find(a => a.id === targetId) : null;
@@ -71,11 +71,11 @@ export const AdminInterview: React.FC = () => {
           if (event.data.resourceId) {
             setInterviewResources(prev => prev.map(r => {
               if (r.id === event.data.resourceId || (r.loginId && r.loginId === event.data.resourceId)) {
-                return { 
-                  ...r, 
+                return {
+                  ...r,
                   answer: event.data.answer !== undefined ? event.data.answer : (event.data.questions?.[0]?.answer ?? r.answer),
                   questions: event.data.questions || r.questions,
-                  status: 'In Progress' 
+                  status: 'In Progress'
                 };
               }
               return r;
@@ -101,9 +101,9 @@ export const AdminInterview: React.FC = () => {
         getAdminAudits().then(res => {
           if (res.success && Array.isArray(res.audits)) {
             setAudits(res.audits);
-            setSelectedAudit(prev => {
+            setSelectedAudit((prev: any) => {
               if (!prev) return prev;
-              const fresh = res.audits.find(a => a.id === prev.id);
+              const fresh = res.audits.find((a: any) => a.id === prev.id);
               if (fresh && JSON.stringify(fresh.interviewResources) !== JSON.stringify(prev.interviewResources)) {
                 initResourcesForAudit(fresh);
                 return fresh;
@@ -111,7 +111,7 @@ export const AdminInterview: React.FC = () => {
               return prev;
             });
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }, 10000);
 
@@ -145,9 +145,9 @@ export const AdminInterview: React.FC = () => {
 
     // If Re-Audit has no interview resources, fallback to parent audit resources if available
     if (sourceResources.length === 0 && Array.isArray(audits)) {
-      const parentAudit = audits.find(a => 
+      const parentAudit = audits.find(a =>
         a.id !== audit.id && (
-          a.id === audit.parentAuditId || 
+          a.id === audit.parentAuditId ||
           a.id === audit.originalAuditId ||
           audit.parentAuditId === a.id ||
           (audit.auditIdString && a.auditIdString && audit.auditIdString.replace(/-RA\d*$/, '') === a.auditIdString.replace(/-RA\d*$/, ''))
@@ -164,7 +164,7 @@ export const AdminInterview: React.FC = () => {
         return sourceResources.map((incoming: any) => {
           const ex = prevMap.get(incoming.id);
           // Also look for answers across other audits in memory (e.g. parent audit or re-audit)
-          const allOtherRes = (audits || []).flatMap(a => a.interviewResources || []).find((rr: any) => 
+          const allOtherRes = (audits || []).flatMap(a => a.interviewResources || []).find((rr: any) =>
             (rr.id && rr.id === incoming.id) || (rr.loginId && rr.loginId === incoming.loginId)
           );
 
@@ -413,7 +413,7 @@ export const AdminInterview: React.FC = () => {
       setInterviewResources(updated);
       setSelectedAudit((prev: any) => prev ? { ...prev, interviewResources: updated } : prev);
       setAudits(prev => prev.map(a => a.id === targetAuditId ? { ...a, interviewResources: updated } : a));
-      
+
       const newSavedIds = new Set<string>();
       updated.forEach((r: any) => {
         if (r.isQuestionSaved || (r.question && r.question.trim().length > 0)) {
@@ -531,16 +531,16 @@ export const AdminInterview: React.FC = () => {
       )}
 
       <div style={{ padding: '1.5rem', backgroundColor: '#F8FAFC', minHeight: '100vh', animation: 'fadeIn 0.3s ease' }}>
-        
+
         {/* HEADER SECTION */}
         <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ 
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem', 
-              padding: '0.2rem 0.65rem', borderRadius: '999px', 
-              background: '#EFF6FF', border: '1px solid #BFDBFE', 
-              color: '#1565C0', fontSize: '0.75rem', fontWeight: 800, 
-              textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' 
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+              padding: '0.2rem 0.65rem', borderRadius: '999px',
+              background: '#EFF6FF', border: '1px solid #BFDBFE',
+              color: '#1565C0', fontSize: '0.75rem', fontWeight: 800,
+              textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem'
             }}>
               <MessageSquareQuote size={13} /> Interview & Resource Governance
             </div>
@@ -780,11 +780,11 @@ export const AdminInterview: React.FC = () => {
                   interviewResources.map((row, index) => {
                     const isRowSelected = row.id === selectedResourceId;
                     return (
-                      <tr 
-                        key={row.id || index} 
+                      <tr
+                        key={row.id || index}
                         className={`resource-row-hover ${isRowSelected ? 'resource-row-selected' : ''}`}
                         onClick={() => setSelectedResourceId(row.id)}
-                        style={{ 
+                        style={{
                           borderBottom: index < interviewResources.length - 1 ? '1px solid #F1F5F9' : 'none',
                           cursor: 'pointer',
                           transition: 'background-color 0.12s ease'
@@ -904,9 +904,9 @@ export const AdminInterview: React.FC = () => {
                               backgroundColor: '#FFFFFF',
                               color: row.status === 'Initiate' ? '#1D4ED8'
                                 : row.status === 'Completed' || row.status === 'Compliant' ? '#047857'
-                                : row.status === 'Non-Compliant' ? '#B91C1C'
-                                : row.status === 'In Progress' ? '#2563EB'
-                                : '#475569',
+                                  : row.status === 'Non-Compliant' ? '#B91C1C'
+                                    : row.status === 'In Progress' ? '#2563EB'
+                                      : '#475569',
                               outline: 'none',
                               cursor: 'pointer',
                               boxSizing: 'border-box'
@@ -976,12 +976,12 @@ export const AdminInterview: React.FC = () => {
             animation: 'fadeIn 0.25s ease'
           }}>
             {/* Header for Question & Answer */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              marginBottom: '1rem', 
-              paddingBottom: '0.75rem', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1rem',
+              paddingBottom: '0.75rem',
               borderBottom: '1px solid #E2E8F0',
               flexWrap: 'wrap',
               gap: '0.5rem'
@@ -1039,7 +1039,7 @@ export const AdminInterview: React.FC = () => {
             {/* Dynamic Question & Answer pairs */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {getResourceQuestions(currentResource).map((qaItem, qIdx, allQa) => (
-                <div 
+                <div
                   key={qaItem.id}
                   style={{
                     display: 'grid',
@@ -1054,14 +1054,14 @@ export const AdminInterview: React.FC = () => {
                   {/* LEFT FIELD: QUESTION */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                      <label 
+                      <label
                         htmlFor={`interview-question-${qaItem.id}`}
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          fontSize: '0.85rem', 
-                          fontWeight: 800, 
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
                           color: '#0F172A'
                         }}
                       >
@@ -1122,7 +1122,7 @@ export const AdminInterview: React.FC = () => {
                       }}
                     />
                     <span style={{ fontSize: '0.725rem', color: '#64748B', marginTop: '0.25rem', display: 'block' }}>
-                      {isQuestionReadOnly 
+                      {isQuestionReadOnly
                         ? 'Statutory interview question saved by admin (Read-only).'
                         : 'Statutory interview question asked to this candidate.'}
                     </span>
@@ -1174,14 +1174,14 @@ export const AdminInterview: React.FC = () => {
                       return (
                         <>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <label 
+                            <label
                               htmlFor={`interview-answer-${qaItem.id}`}
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '6px', 
-                                fontSize: '0.85rem', 
-                                fontWeight: 800, 
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.85rem',
+                                fontWeight: 800,
                                 color: '#0F172A'
                               }}
                             >
