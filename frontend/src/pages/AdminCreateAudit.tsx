@@ -20,7 +20,9 @@ export const AdminCreateAudit: React.FC = () => {
     auditPeriod: 'Q1 2026',
     startDate: '',
     dueDate: '',
-    establishmentType: 'Factory'
+    establishmentType: 'Factory',
+    country: 'India',
+    state: 'All'
   });
 
   const sidebarItems = getAdminSidebarItems('Audits');
@@ -208,6 +210,41 @@ export const AdminCreateAudit: React.FC = () => {
                     value={formData.dueDate} 
                     onChange={e => setFormData({...formData, dueDate: e.target.value})} 
                   />
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Country <span className="req">*</span>
+                  </label>
+                  <select 
+                    disabled
+                    className="admin-form-select bg-slate-50 text-slate-800" 
+                    value={formData.country} 
+                    onChange={e => setFormData({...formData, country: e.target.value})}
+                  >
+                    <option value="India">🇮🇳 India</option>
+                  </select>
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    State Jurisdiction <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select font-semibold" 
+                    value={formData.state} 
+                    onChange={e => setFormData({...formData, state: e.target.value})}
+                  >
+                    <option value="All">All (Consolidated States)</option>
+                    <option value="N/A">N/A (General / Unassigned)</option>
+                    <option value="Maharashtra">Maharashtra</option>
+                    <option value="Haryana">Haryana</option>
+                    <option value="Telangana">Telangana</option>
+                    <option value="Karnataka">Karnataka</option>
+                    <option value="Madhya Pradesh">Madhya Pradesh</option>
+                    <option value="Uttar Pradesh">Uttar Pradesh</option>
+                  </select>
                 </div>
 
                 <div className="admin-form-group full-width">

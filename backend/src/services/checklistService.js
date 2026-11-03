@@ -146,7 +146,7 @@ function addChecklistItem(vendorType, item) {
 
 function updateChecklistItem(id, updates) {
   let found = false;
-  
+
   // Look in otherVendorChecklist
   for (let i = 0; i < otherVendorChecklist.length; i++) {
     if (otherVendorChecklist[i].id === id) {
@@ -155,7 +155,7 @@ function updateChecklistItem(id, updates) {
       break;
     }
   }
-  
+
   // Look in securityVendorChecklist if not found
   if (!found) {
     for (let i = 0; i < securityVendorChecklist.length; i++) {
@@ -185,3 +185,6 @@ module.exports = {
   addChecklistItem,
   updateChecklistItem
 };
+
+
+

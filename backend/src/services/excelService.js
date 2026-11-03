@@ -55,6 +55,8 @@ function extractChecklistFromExcel(filePath, idPrefix) {
     const item = {
       id: `${idPrefix}-${paddedId}`,
       serialNumber: Math.floor(srNo),
+      country: 'India',
+      state: 'N/A',
       title: title,
       type: type,
       particulars: particulars,
@@ -92,6 +94,17 @@ function syncChecklistJsonFiles(referenceDir, outputDir) {
     JSON.stringify(securityItems, null, 2),
     'utf-8'
   );
+
+  // Also check if state checklist exists; if not, import from reference
+  const stateJsonPath = path.join(outputDir, 'stateVendorChecklist.json');
+  if (!fs.existsSync(stateJsonPath)) {
+    try {
+      const { importStateChecklist } = require('../scripts/importStateChecklist');
+      importStateChecklist();
+    } catch (e) {
+      console.warn('[State Checklist Sync Warning]:', e.message);
+    }
+  }
 
   return {
     otherCount: otherItems.length,

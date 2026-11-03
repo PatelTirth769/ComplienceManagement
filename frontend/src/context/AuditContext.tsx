@@ -14,6 +14,8 @@ import { getVendorTypes, getChecklist, calculateCompliance, saveAudit, API_BASE_
 interface AuditContextType {
   vendorTypes: VendorType[];
   selectedVendorType: string;
+  selectedState: string;
+  selectedCountry: string;
   auditInfo: AuditInformation;
   checklist: ChecklistItem[];
   responses: Record<string, { status: ComplianceStatus | ''; remarks: string }>;
@@ -33,6 +35,8 @@ interface AuditContextType {
 
   // Actions
   setSelectedVendorType: (vendorType: string) => void;
+  setSelectedState: (state: string) => void;
+  setSelectedCountry: (country: string) => void;
   updateAuditInfo: (field: keyof AuditInformation, value: any) => void;
   updateResponseStatus: (itemId: string, status: ComplianceStatus) => void;
   updateResponseRemarks: (itemId: string, remarks: string) => void;
@@ -69,7 +73,9 @@ const initialAuditInfo: AuditInformation = {
   vendorRepresentative: '',
   clientRepresentative: '',
   employeeCount: '',
-  vendorType: 'other-vendor'
+  vendorType: 'other-vendor',
+  country: 'India',
+  state: 'All'
 };
 
 const AuditContext = createContext<AuditContextType | undefined>(undefined);
@@ -77,6 +83,8 @@ const AuditContext = createContext<AuditContextType | undefined>(undefined);
 export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [vendorTypes, setVendorTypes] = useState<VendorType[]>([]);
   const [selectedVendorType, setSelectedVendorTypeState] = useState<string>('other-vendor');
+  const [selectedState, setSelectedStateState] = useState<string>('All');
+  const [selectedCountry, setSelectedCountryState] = useState<string>('India');
   const [auditInfo, setAuditInfo] = useState<AuditInformation>(initialAuditInfo);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [responses, setResponses] = useState<Record<string, { status: ComplianceStatus | ''; remarks: string }>>({});
@@ -126,7 +134,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  // Load Checklist when selectedVendorType changes
+  // Load Checklist when selectedVendorType or selectedState or selectedCountry changes
   useEffect(() => {
     if (!selectedVendorType) return;
     let isMounted = true;
@@ -135,7 +143,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
         setLoadingChecklist(true);
         setError(null);
-        const data = await getChecklist(selectedVendorType);
+        const data = await getChecklist(selectedVendorType, selectedState, selectedCountry);
         if (isMounted) {
           setChecklist(data.checklist);
           const initialResp: Record<string, { status: ComplianceStatus | ''; remarks: string }> = {};
@@ -163,11 +171,21 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return () => {
       isMounted = false;
     };
-  }, [selectedVendorType]);
+  }, [selectedVendorType, selectedState, selectedCountry]);
 
   const setSelectedVendorType = (vendorType: string) => {
     setSelectedVendorTypeState(vendorType);
     setAuditInfo(prev => ({ ...prev, vendorType }));
+  };
+
+  const setSelectedState = (state: string) => {
+    setSelectedStateState(state);
+    setAuditInfo(prev => ({ ...prev, state }));
+  };
+
+  const setSelectedCountry = (country: string) => {
+    setSelectedCountryState(country);
+    setAuditInfo(prev => ({ ...prev, country }));
   };
 
   const updateAuditInfo = (field: keyof AuditInformation, value: any) => {
@@ -356,7 +374,9 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       const payload = {
         vendorType: selectedVendorType,
-        responses: payloadResponses
+        responses: payloadResponses,
+        state: selectedState,
+        country: selectedCountry
       };
 
       const result = await calculateCompliance(payload);
@@ -405,6 +425,8 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       const auditPayload = {
         ...auditInfo,
+        country: selectedCountry,
+        state: selectedState,
         vendorType: selectedVendorType,
         responses: payloadResponses
       };
@@ -425,6 +447,8 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const resetAssessment = () => {
     setAuditInfo(initialAuditInfo);
+    setSelectedStateState('All');
+    setSelectedCountryState('India');
     setCalculationResult(null);
     setSavedAudit(null);
     setError(null);
@@ -449,6 +473,8 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       value={{
         vendorTypes,
         selectedVendorType,
+        selectedState,
+        selectedCountry,
         auditInfo,
         checklist,
         responses,
@@ -464,6 +490,8 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         categoryFilter,
         statusFilter,
         setSelectedVendorType,
+        setSelectedState,
+        setSelectedCountry,
         updateAuditInfo,
         updateResponseStatus,
         updateResponseRemarks,
