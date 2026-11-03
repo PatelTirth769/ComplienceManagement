@@ -5,6 +5,7 @@ import {
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, CheckCircle2, Info
 } from 'lucide-react';
 import { getVendorNotifications } from '../services/api';
+import { formatDateTime } from '../utils/dateUtils';
 
 export const VendorNotifications: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -123,7 +124,7 @@ export const VendorNotifications: React.FC = () => {
                         {notif.title}
                       </h4>
                       <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, background: '#F8FAFC', padding: '0.15rem 0.5rem', borderRadius: '6px', border: '1px solid #F1F5F9' }}>
-                        {new Date(notif.timestamp).toLocaleString()}
+                        {formatDateTime(notif.timestamp)}
                       </span>
                     </div>
                     <p style={{ color: '#475569', fontSize: '0.8375rem', margin: 0, lineHeight: 1.45 }}>

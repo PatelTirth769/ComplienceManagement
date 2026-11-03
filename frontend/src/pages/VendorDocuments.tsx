@@ -3,9 +3,10 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   LayoutDashboard, User, FileCheck, FolderOpen, 
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Upload, FileText, Download, CheckCircle2,
-  FileCheck2, ShieldCheck, ChevronDown, Search, X, Calendar, FileUp, Loader2
+  FileCheck2, ShieldCheck, ChevronDown, Search, X, Calendar, FileUp, Loader2, Filter
 } from 'lucide-react';
 import { getVendorDashboardStats, uploadVendorDocument, getVendorDocuments, getVendorDocumentUrl, getVendorAudits } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 
 export const VendorDocuments: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -95,15 +96,29 @@ export const VendorDocuments: React.FC = () => {
     }
   };
 
+  const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFileToUpload(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        alert('Max size limit is 5MB');
+        e.target.value = '';
+        setFileToUpload(null);
+        return;
+      }
+      setFileToUpload(file);
     }
   };
 
   const handleUpload = async () => {
     if (!fileToUpload || !activeAudit) return;
     
+    if (fileToUpload.size > MAX_FILE_SIZE_BYTES) {
+      alert('Max size limit is 5MB');
+      return;
+    }
+
     setIsUploading(true);
     try {
       const reader = new FileReader();
@@ -140,13 +155,62 @@ export const VendorDocuments: React.FC = () => {
     }
   };
 
+  const resolveWorkingFileUrl = async (rawUrl: string): Promise<string> => {
+    if (!rawUrl || !rawUrl.startsWith('http')) return rawUrl;
+    try {
+      const headCheck = await fetch(rawUrl, { method: 'HEAD' });
+      if (headCheck.ok) return rawUrl;
+    } catch {
+      // Continue
+    }
+    if (rawUrl.includes('?')) {
+      const cleanUrl = rawUrl.split('?')[0];
+      try {
+        const cleanCheck = await fetch(cleanUrl, { method: 'HEAD' });
+        if (cleanCheck.ok) return cleanUrl;
+      } catch {
+        // Continue
+      }
+    }
+    return rawUrl;
+  };
+
   const handleDownload = async (doc: any) => {
     try {
       const response = await getVendorDocumentUrl(doc.id);
       if (response.success) {
-        if (response.isUrl) {
-          window.open(response.data, '_blank');
-        } else {
+        if (response.isUrl && response.data) {
+          let workingUrl = await resolveWorkingFileUrl(response.data);
+          let fileResp = await fetch(workingUrl);
+
+          if (!fileResp.ok && workingUrl.includes('?')) {
+            const cleanUrl = workingUrl.split('?')[0];
+            const retry = await fetch(cleanUrl);
+            if (retry.ok) {
+              fileResp = retry;
+              workingUrl = cleanUrl;
+            }
+          }
+
+          if (!fileResp.ok) {
+            throw new Error(`Storage returned status ${fileResp.status}`);
+          }
+
+          const contentType = fileResp.headers.get('content-type') || '';
+          if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
+            throw new Error('Access denied by storage provider: Received error response');
+          }
+
+          const blob = await fileResp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = response.fileName || doc.fileName || 'document';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        } else if (response.data) {
           const a = document.createElement('a');
           a.href = response.data;
           a.download = response.fileName || doc.fileName;
@@ -157,9 +221,9 @@ export const VendorDocuments: React.FC = () => {
       } else {
         alert('Could not download document.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Download error:', error);
-      alert('Error downloading document.');
+      alert('Error downloading document: ' + (error.message || 'Network error'));
     }
   };
 
@@ -235,7 +299,7 @@ export const VendorDocuments: React.FC = () => {
             </div>
           </div>
           <div className="admin-kpi-value">PDF, PNG, JPG</div>
-          <span className="admin-kpi-subtext">Up to 10 MB per verified file</span>
+          <span className="admin-kpi-subtext">Up to 5 MB per verified file</span>
           <span className="admin-kpi-badge">Certified</span>
         </div>
       </div>
@@ -313,6 +377,22 @@ export const VendorDocuments: React.FC = () => {
                 <label 
                   htmlFor="file-upload-input"
                   className="vdocs-dropzone"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      const file = e.dataTransfer.files[0];
+                      if (file.size > MAX_FILE_SIZE_BYTES) {
+                        alert('Max size limit is 5MB');
+                        setFileToUpload(null);
+                        const fileInput = document.getElementById('file-upload-input') as HTMLInputElement;
+                        if (fileInput) fileInput.value = '';
+                        return;
+                      }
+                      setFileToUpload(file);
+                    }
+                  }}
                 >
                   <div className="vdocs-dropzone-icon-circle">
                     <Upload className="w-5 h-5" />
@@ -321,7 +401,7 @@ export const VendorDocuments: React.FC = () => {
                     Choose statutory document
                   </span>
                   <span className="vdocs-dropzone-hint">
-                    PDF, PNG, JPG (Max 10 MB)
+                    PDF, PNG, JPG (Max 5 MB)
                   </span>
                   <input 
                     id="file-upload-input"
@@ -391,8 +471,8 @@ export const VendorDocuments: React.FC = () => {
               </span>
             </div>
 
-            <div className="table-toolbar" style={{ padding: '0.875rem 1.375rem', borderBottom: '1px solid #F1F5F9' }}>
-              <div className="search-input-wrapper" style={{ maxWidth: '280px' }}>
+            <div className="table-toolbar" style={{ padding: '0.875rem 1.375rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div className="search-input-wrapper" style={{ flex: '1', minWidth: '200px', maxWidth: '300px' }}>
                 <Search className="search-input-icon" />
                 <input 
                   type="text" 
@@ -401,20 +481,32 @@ export const VendorDocuments: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
-                >
-                  <option value="ALL">All Categories</option>
-                  <option value="General">General</option>
-                  <option value="License">License</option>
-                  <option value="Policy">Policy</option>
-                  <option value="Payroll">Payroll</option>
-                  <option value="Proof">Proof</option>
-                </select>
-                <span className="text-xs text-slate-500 font-semibold hidden sm:inline">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+                <div className="filter-dropdown-wrapper" title="Filter by Document Category">
+                  <Filter className="filter-dropdown-icon" />
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="filter-dropdown-select"
+                  >
+                    <option value="ALL">All Categories</option>
+                    <option value="General">General</option>
+                    <option value="License">License</option>
+                    <option value="Policy">Policy</option>
+                    <option value="Payroll">Payroll</option>
+                    <option value="Proof">Proof</option>
+                  </select>
+                </div>
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 650,
+                  color: '#475569',
+                  backgroundColor: '#F1F5F9',
+                  border: '1px solid #E2E8F0',
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: '6px',
+                  whiteSpace: 'nowrap'
+                }}>
                   Showing {filteredDocs.length} of {documents.length}
                 </span>
               </div>
@@ -469,7 +561,7 @@ export const VendorDocuments: React.FC = () => {
                             <td>
                               <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
                                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'}
+                                {formatDate(doc.uploadedAt, 'N/A')}
                               </div>
                             </td>
                             <td style={{ textAlign: 'right' }}>

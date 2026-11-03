@@ -6,12 +6,15 @@ import { CategoryScoreTable } from './CategoryScoreTable';
 import { NonCompliantList } from './NonCompliantList';
 import { Save, CheckCircle2, Building2, User, Calendar, MapPin, Users, Award, FileCheck, FileSpreadsheet } from 'lucide-react';
 import { downloadAuditorExcel } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 
 export const ResultsDashboard: React.FC = () => {
   const {
     calculationResult,
     auditInfo,
     selectedVendorType,
+    selectedState,
+    selectedCountry,
     vendorTypes,
     saveAuditRecord,
     saving,
@@ -37,6 +40,8 @@ export const ResultsDashboard: React.FC = () => {
 
       const payload = {
         ...auditInfo,
+        country: selectedCountry || auditInfo.country || 'India',
+        state: selectedState || auditInfo.state || 'All',
         vendorType: selectedVendorType,
         responses: payloadResponses,
         auditId: savedAudit?.id
@@ -46,8 +51,10 @@ export const ResultsDashboard: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const auditIdStr = savedAudit?.auditIdString || savedAudit?.id || 'AUDIT';
-      const periodStr = (auditInfo.auditMonth || 'Report').replace(/\s+/g, '_');
+      const auditIdStr = String(savedAudit?.auditIdString || savedAudit?.id || 'AUDIT').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const periodStr = String(auditInfo.auditMonth || 'Report')
+        .replace(/[\u2010-\u2015]/g, '-')
+        .replace(/[^a-zA-Z0-9_.-]/g, '_');
       link.download = `${auditIdStr}_${periodStr}_Complete-Audit.xlsx`;
       document.body.appendChild(link);
       link.click();
@@ -55,7 +62,23 @@ export const ResultsDashboard: React.FC = () => {
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error('Download Excel error:', err);
-      alert('Failed to generate and download Excel report. Please try again.');
+      let errorMessage = 'Failed to generate and download Excel report. Please try again.';
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json?.error?.message) {
+            errorMessage = json.error.message;
+          } else if (json?.error && typeof json.error === 'string') {
+            errorMessage = json.error;
+          }
+        } catch {
+          // fallback to default error message
+        }
+      } else if (err?.response?.data?.error?.message) {
+        errorMessage = err.response.data.error.message;
+      }
+      alert(errorMessage);
     } finally {
       setExportingExcel(false);
     }
@@ -171,7 +194,7 @@ export const ResultsDashboard: React.FC = () => {
               <span className="metadata-label">Audit Month / Date</span>
             </div>
             <div className="metadata-value">
-              {auditInfo.auditMonth || 'N/A'} {auditInfo.auditDate ? `(${auditInfo.auditDate})` : ''}
+              {auditInfo.auditMonth || 'N/A'} {auditInfo.auditDate ? `(${formatDate(auditInfo.auditDate)})` : ''}
             </div>
           </div>
 

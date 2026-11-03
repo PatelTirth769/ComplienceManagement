@@ -6,7 +6,7 @@ import { AssessmentSummary } from '../components/AssessmentSummary';
 import { SearchAndFilter } from '../components/SearchAndFilter';
 import { CategorySection } from '../components/CategorySection';
 import { ResultsDashboard } from '../components/ResultsDashboard';
-import { Calculator, AlertCircle, Loader2 } from 'lucide-react';
+import { Calculator, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import type { ChecklistItem } from '../types/compliance';
 
 export const ComplianceCalculatorPage: React.FC = () => {
@@ -21,7 +21,12 @@ export const ComplianceCalculatorPage: React.FC = () => {
     statusFilter,
     calculateScore,
     calculating,
-    progressMetrics
+    progressMetrics,
+    auditType,
+    isReAuditInitiated,
+    calculationResult,
+    isReadOnly,
+    savedAudit
   } = useAudit();
 
   // Filter items dynamically based on search, category filter, and status filter
@@ -100,6 +105,29 @@ export const ComplianceCalculatorPage: React.FC = () => {
           </div>
         )}
 
+        {/* Re-Audit Mode Active Banner */}
+        {(auditType === 'Re-Audit' || isReAuditInitiated) && (
+          <div 
+            style={{
+              marginBottom: '1rem',
+              padding: '0.75rem 1.25rem',
+              borderRadius: '0.75rem',
+              backgroundColor: '#F5F3FF',
+              border: '1.5px solid #DDD6FE',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              color: '#5B21B6',
+              boxShadow: '0 1px 3px rgba(124, 58, 237, 0.08)'
+            }}
+          >
+            <RotateCcw className="w-5 h-5 text-purple-600 flex-shrink-0 animate-spin-slow" />
+            <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>
+              <strong style={{ color: '#4C1D95' }}>Re-Audit Assessment Mode:</strong> You are evaluating a fresh Re-Audit. Assess all statutory checklist items below (Compliant / Non-Compliant / NA), click <em>Calculate Compliance Score</em>, and then click <em>Save Audit Record</em>. The previous original audit is preserved as Read-Only.
+            </div>
+          </div>
+        )}
+
         {/* Section 1: Audit Information */}
         <AuditInformation />
 
@@ -144,7 +172,9 @@ export const ComplianceCalculatorPage: React.FC = () => {
               <div className="calculate-info-left">
                 <h3 className="font-bold text-slate-900 text-sm">Calculate Compliance Score</h3>
                 <p className="text-xs text-slate-500">
-                  {progressMetrics.pending > 0
+                  {calculationResult || savedAudit || isReadOnly
+                    ? 'Compliance score calculated. Evaluation items are in read-only mode.'
+                    : progressMetrics.pending > 0
                     ? `${progressMetrics.pending} items remain pending. Complete assessment before calculating.`
                     : 'All items assessed! Click button to process score via backend scoring engine.'}
                 </p>
@@ -154,12 +184,18 @@ export const ComplianceCalculatorPage: React.FC = () => {
                 type="button"
                 className="btn btn-primary btn-calculate"
                 onClick={calculateScore}
-                disabled={calculating || loadingChecklist}
+                disabled={calculating || loadingChecklist || Boolean(calculationResult) || Boolean(savedAudit) || isReadOnly}
+                style={calculationResult || savedAudit || isReadOnly ? { cursor: 'not-allowed', opacity: 0.65 } : undefined}
               >
                 {calculating ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin inline-block" />
                     <span>Processing Calculation...</span>
+                  </>
+                ) : calculationResult || savedAudit || isReadOnly ? (
+                  <>
+                    <Calculator className="w-5 h-5 mr-2 inline-block" />
+                    <span>Score Calculated (Read-Only)</span>
                   </>
                 ) : (
                   <>

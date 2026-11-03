@@ -11,6 +11,7 @@ import {
   markCustomerNotificationRead, 
   markAllCustomerNotificationsRead 
 } from '../services/api';
+import { formatDateTime } from '../utils/dateUtils';
 
 export const CustomerNotifications: React.FC = () => {
   const navigate = useNavigate();
@@ -300,7 +301,7 @@ export const CustomerNotifications: React.FC = () => {
                         </div>
 
                         <span style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 500 }}>
-                          {new Date(item.timestamp).toLocaleString()}
+                          {formatDateTime(item.timestamp)}
                         </span>
                       </div>
 

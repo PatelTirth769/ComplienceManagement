@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit');
+const { formatDate, formatDateTime } = require('../utils/dateUtils');
 
 /**
  * Generates a production-ready PDF Audit Report Buffer from real audit data.
@@ -52,7 +53,7 @@ function generateAuditReportPdf(audit) {
       const metadata = [
         [ 'Customer / Organisation:', audit.organisation || audit.customerName || 'N/A', 'Establishment Type:', audit.establishmentType || audit.vendorType || 'General' ],
         [ 'Vendor Name:', audit.vendorName || 'N/A', 'Site / Location:', audit.site || 'N/A' ],
-        [ 'Assigned Auditor:', audit.auditorName || audit.auditor || 'N/A', 'Audit Month / Date:', audit.auditMonth || audit.auditDate || 'N/A' ],
+        [ 'Assigned Auditor:', audit.auditorName || audit.auditor || 'N/A', 'Audit Month / Date:', audit.auditMonth ? (audit.auditDate ? `${audit.auditMonth} (${formatDate(audit.auditDate)})` : audit.auditMonth) : (audit.auditDate ? formatDate(audit.auditDate) : 'N/A') ],
         [ 'Vendor Representative:', audit.vendorRepresentative || 'N/A', 'Client Representative:', audit.clientRepresentative || 'N/A' ],
         [ 'Audit Status:', (audit.status || 'CLOSED').toUpperCase(), 'Employee Count:', String(audit.employeeCount || 'N/A') ]
       ];
@@ -236,13 +237,13 @@ function generateAuditReportPdf(audit) {
       doc.fillColor('#059669').font('Helvetica-Bold').fontSize(8.5).text((audit.status || 'Closed').toUpperCase(), 140, currentY + 8);
 
       doc.fillColor(primaryColor).font('Helvetica-Bold').fontSize(8.5).text('Approved / Released Date:', 48, currentY + 24);
-      doc.fillColor(grayColor).font('Helvetica').fontSize(8.5).text(closedEvent.timestamp ? new Date(closedEvent.timestamp).toLocaleString() : new Date().toLocaleDateString(), 180, currentY + 24);
+      doc.fillColor(grayColor).font('Helvetica').fontSize(8.5).text(formatDateTime(closedEvent.timestamp || new Date()), 180, currentY + 24);
 
       doc.fillColor(primaryColor).font('Helvetica-Bold').fontSize(8.5).text('Authorized Auditor:', 320, currentY + 8);
       doc.fillColor(grayColor).font('Helvetica').fontSize(8.5).text(audit.auditorName || audit.auditor || 'Compliance Officer', 420, currentY + 8);
 
       doc.fillColor(primaryColor).font('Helvetica-Bold').fontSize(8.5).text('Report Generation:', 320, currentY + 24);
-      doc.fillColor(grayColor).font('Helvetica').fontSize(8.5).text(new Date().toISOString().split('T')[0], 420, currentY + 24);
+      doc.fillColor(grayColor).font('Helvetica').fontSize(8.5).text(formatDate(new Date()), 420, currentY + 24);
 
       // Footer line on last page
       doc.fontSize(7.5).fillColor('#94A3B8').font('Helvetica').text('Labor Compliance Audit Management System — System Generated Final Audit Report', 40, 780, { align: 'center', width: 515 });

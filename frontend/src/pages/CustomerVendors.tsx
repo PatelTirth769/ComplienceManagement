@@ -207,18 +207,28 @@ export const CustomerVendors: React.FC = () => {
       ) : (
         <div className="vendor-table-card" style={{ animation: 'fadeIn 0.3s ease 0.15s both' }}>
           {filteredVendors.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8375rem' }}>
+            <div style={{ width: '100%', overflowX: 'hidden' }}>
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8125rem' }}>
+                <colgroup>
+                  <col style={{ width: '19%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '8%' }} />
+                </colgroup>
                 <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Vendor</th>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Vendor ID</th>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Contact Person</th>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Current Audit</th>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Status</th>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Progress</th>
-                    <th style={{ padding: '0.875rem 1.25rem' }}>Compliance Score</th>
-                    <th style={{ padding: '0.875rem 1.25rem', textAlign: 'right' }}>Actions</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Vendor</th>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Vendor ID</th>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Contact Person</th>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Current Audit</th>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Status</th>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Progress</th>
+                    <th style={{ padding: '0.75rem 0.6rem' }}>Compliance Score</th>
+                    <th style={{ padding: '0.75rem 0.6rem', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -233,46 +243,56 @@ export const CustomerVendors: React.FC = () => {
                     return (
                       <tr key={vendor.id} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.15s ease' }}>
                         {/* Vendor Name */}
-                        <td style={{ padding: '1rem 1.25rem', fontWeight: 700, color: '#0B1F3A' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Building2 style={{ width: '16px', height: '16px', color: '#1565C0' }} />
+                        <td style={{ padding: '0.75rem 0.6rem', fontWeight: 700, color: '#0B1F3A', overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Building2 style={{ width: '15px', height: '15px', color: '#1565C0' }} />
                             </div>
-                            <div>
-                              <div style={{ fontSize: '0.875rem' }}>{vendor.companyName || vendor.name || 'Vendor'}</div>
-                              <div style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 500 }}>{vendor.establishmentDetails || vendor.industry || 'Supplier / Service Provider'}</div>
+                            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                              <div style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={vendor.companyName || vendor.name || 'Vendor'}>
+                                {vendor.companyName || vendor.name || 'Vendor'}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={vendor.establishmentDetails || vendor.industry || 'Supplier / Service Provider'}>
+                                {vendor.establishmentDetails || vendor.industry || 'Supplier / Service Provider'}
+                              </div>
                             </div>
                           </div>
                         </td>
 
                         {/* Vendor ID */}
-                        <td style={{ padding: '1rem 1.25rem', color: '#64748B', fontWeight: 600, fontFamily: 'monospace' }}>
+                        <td style={{ padding: '0.75rem 0.6rem', color: '#64748B', fontWeight: 600, fontFamily: 'monospace', fontSize: '0.775rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           #{vendor.id ? vendor.id.slice(0, 8) : 'N/A'}
                         </td>
 
                         {/* Contact Person */}
-                        <td style={{ padding: '1rem 1.25rem', color: '#475569' }}>
-                          <div>{vendor.contactPerson || vendor.representative || 'N/A'}</div>
-                          {vendor.email && <div style={{ fontSize: '0.725rem', color: '#94A3B8' }}>{vendor.email}</div>}
+                        <td style={{ padding: '0.75rem 0.6rem', color: '#475569', overflow: 'hidden' }}>
+                          <div style={{ fontSize: '0.7875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }} title={vendor.contactPerson || vendor.representative || 'N/A'}>
+                            {vendor.contactPerson || vendor.representative || 'N/A'}
+                          </div>
+                          {vendor.email && (
+                            <div style={{ fontSize: '0.7rem', color: '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={vendor.email}>
+                              {vendor.email}
+                            </div>
+                          )}
                         </td>
 
                         {/* Current Audit */}
-                        <td style={{ padding: '1rem 1.25rem', color: '#0B1F3A', fontWeight: 700 }}>
+                        <td style={{ padding: '0.75rem 0.6rem', color: '#0B1F3A', fontWeight: 700, overflow: 'hidden' }}>
                           {ca ? (
-                            <div>
-                              <div>{ca.auditIdString}</div>
-                              <div style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 500 }}>{ca.auditPeriod}</div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.8rem' }}>{ca.auditIdString}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ca.auditPeriod}</div>
                             </div>
                           ) : (
-                            <span style={{ color: '#94A3B8', fontWeight: 500 }}>No audit</span>
+                            <span style={{ color: '#94A3B8', fontWeight: 500, fontSize: '0.75rem' }}>No audit</span>
                           )}
                         </td>
 
                         {/* Status */}
-                        <td style={{ padding: '1rem 1.25rem' }}>
+                        <td style={{ padding: '0.75rem 0.6rem', whiteSpace: 'nowrap' }}>
                           <span style={{
-                            display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.625rem',
-                            borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
+                            display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.5rem',
+                            borderRadius: '999px', fontSize: '0.7rem', fontWeight: 700,
                             background: st.bg, color: st.color, border: `1px solid ${st.border}`
                           }}>
                             {st.label}
@@ -280,13 +300,13 @@ export const CustomerVendors: React.FC = () => {
                         </td>
 
                         {/* Progress */}
-                        <td style={{ padding: '1rem 1.25rem', width: '120px' }}>
+                        <td style={{ padding: '0.75rem 0.6rem' }}>
                           {ca ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div style={{ flexGrow: 1, height: '6px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <div style={{ flexGrow: 1, height: '5px', background: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10B981' : '#1565C0', borderRadius: '999px', transition: 'width 0.3s ease' }} />
                               </div>
-                              <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#475569', minWidth: '28px' }}>{pct}%</span>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', minWidth: '26px' }}>{pct}%</span>
                             </div>
                           ) : (
                             <span style={{ color: '#CBD5E1' }}>—</span>
@@ -294,10 +314,10 @@ export const CustomerVendors: React.FC = () => {
                         </td>
 
                         {/* Compliance Score */}
-                        <td style={{ padding: '1rem 1.25rem' }}>
+                        <td style={{ padding: '0.75rem 0.6rem', whiteSpace: 'nowrap' }}>
                           <span style={{
-                            display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.625rem',
-                            borderRadius: '999px', fontSize: '0.75rem', fontWeight: 800,
+                            display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.5rem',
+                            borderRadius: '999px', fontSize: '0.725rem', fontWeight: 800,
                             background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`
                           }}>
                             {sc.label}
@@ -305,18 +325,18 @@ export const CustomerVendors: React.FC = () => {
                         </td>
 
                         {/* Actions */}
-                        <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
+                        <td style={{ padding: '0.75rem 0.6rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <button
                             onClick={() => navigate(`/customer/vendors/${vendor.id}`)}
                             style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                              padding: '0.375rem 0.75rem', borderRadius: '8px',
+                              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                              padding: '0.3rem 0.6rem', borderRadius: '7px',
                               background: '#EFF6FF', color: '#1565C0', border: '1px solid #BFDBFE',
-                              fontSize: '0.775rem', fontWeight: 700, cursor: 'pointer',
-                              transition: 'all 0.2s ease'
+                              fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                              transition: 'all 0.15s ease'
                             }}
                           >
-                            <Eye style={{ width: '14px', height: '14px' }} />
+                            <Eye style={{ width: '13px', height: '13px' }} />
                             View
                           </button>
                         </td>

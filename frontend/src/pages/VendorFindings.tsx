@@ -5,6 +5,7 @@ import {
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Send, CheckCircle2, Info, Layers
 } from 'lucide-react';
 import { getVendorFindings, respondToVendorFinding, getVendorAudits } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 
 export const VendorFindings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -82,15 +83,85 @@ export const VendorFindings: React.FC = () => {
     }
   };
 
+  // Normalize dashes helper
+  const normalizePeriod = (p?: string) => (p || '').replace(/[\u2010-\u2015]/g, '-').trim();
+
   // Collect all unique audit periods from audits list and findings list
   const auditPeriodList = Array.from(new Set([
-    ...audits.map(a => a.auditPeriod),
-    ...findings.map(f => f.auditPeriod)
+    ...audits.map(a => normalizePeriod(a.auditPeriod || a.auditMonth)),
+    ...findings.map(f => normalizePeriod(f.auditPeriod))
   ].filter(Boolean)));
+
+  type FindingAuditStatus = 'Not Started' | 'Not Completed' | 'Completed' | 'Not Needed';
+
+  const getAuditStatusInfo = (period: string): { status: FindingAuditStatus; total: number; responded: number; open: number } => {
+    let periodFindings = findings;
+    if (period !== 'ALL') {
+      const norm = normalizePeriod(period);
+      periodFindings = findings.filter(f => normalizePeriod(f.auditPeriod) === norm);
+    }
+    
+    const total = periodFindings.length;
+    
+    // 1. If there is no non-compliant or finding in that audit then "Not Needed"
+    if (total === 0) {
+      return { status: 'Not Needed', total: 0, responded: 0, open: 0 };
+    }
+
+    const responded = periodFindings.filter(f => 
+      f.status === 'Responded' || (f.vendorResponse && String(f.vendorResponse).trim().length > 0)
+    ).length;
+    const open = total - responded;
+
+    // 2. If not a single response is done by vendor then "Not Started"
+    if (responded === 0) {
+      return { status: 'Not Started', total, responded, open };
+    }
+
+    // 3. If one or more than one response is done and some are left then "Not Completed"
+    if (responded < total) {
+      return { status: 'Not Completed', total, responded, open };
+    }
+
+    // 4. If all findings are completed or responded then "Completed"
+    return { status: 'Completed', total, responded, open };
+  };
+
+  const getStatusBadgeStyle = (status: FindingAuditStatus, isSelected: boolean) => {
+    switch (status) {
+      case 'Not Started':
+        return {
+          background: isSelected ? 'rgba(239, 68, 68, 0.28)' : '#FEF2F2',
+          color: isSelected ? '#FFFFFF' : '#DC2626',
+          border: `1px solid ${isSelected ? 'rgba(255, 255, 255, 0.45)' : '#FECACA'}`
+        };
+      case 'Not Completed':
+        return {
+          background: isSelected ? 'rgba(245, 158, 11, 0.32)' : '#FFFBEB',
+          color: isSelected ? '#FFFFFF' : '#B45309',
+          border: `1px solid ${isSelected ? 'rgba(255, 255, 255, 0.45)' : '#FDE68A'}`
+        };
+      case 'Completed':
+        return {
+          background: isSelected ? 'rgba(16, 185, 129, 0.32)' : '#ECFDF5',
+          color: isSelected ? '#FFFFFF' : '#059669',
+          border: `1px solid ${isSelected ? 'rgba(255, 255, 255, 0.45)' : '#A7F3D0'}`
+        };
+      case 'Not Needed':
+      default:
+        return {
+          background: isSelected ? 'rgba(255, 255, 255, 0.2)' : '#F1F5F9',
+          color: isSelected ? '#FFFFFF' : '#64748B',
+          border: `1px solid ${isSelected ? 'rgba(255, 255, 255, 0.35)' : '#CBD5E1'}`
+        };
+    }
+  };
 
   const displayedFindings = selectedPeriodFilter === 'ALL' 
     ? findings 
-    : findings.filter(f => f.auditPeriod === selectedPeriodFilter);
+    : findings.filter(f => normalizePeriod(f.auditPeriod) === normalizePeriod(selectedPeriodFilter));
+
+  const currentPeriodStatus = getAuditStatusInfo(selectedPeriodFilter);
 
   if (isLoading) {
     return (
@@ -140,31 +211,39 @@ export const VendorFindings: React.FC = () => {
           <button
             onClick={() => setSelectedPeriodFilter('ALL')}
             style={{
-              padding: '0.4rem 1rem', borderRadius: '8px', fontSize: '0.8125rem', fontWeight: 700,
+              padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.8125rem', fontWeight: 700,
               background: selectedPeriodFilter === 'ALL' ? 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)' : '#F8FAFC',
               color: selectedPeriodFilter === 'ALL' ? 'white' : '#475569',
               border: `1px solid ${selectedPeriodFilter === 'ALL' ? '#1565C0' : '#CBD5E1'}`,
               cursor: 'pointer', transition: 'all 0.2s ease',
+              display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
               boxShadow: selectedPeriodFilter === 'ALL' ? '0 2px 8px rgba(21, 101, 192, 0.25)' : 'none'
             }}
           >
-            All Audits ({findings.length})
+            <span>All Audits</span>
+            <span style={{
+              fontSize: '0.6875rem', padding: '0.1rem 0.4rem', borderRadius: '4px',
+              background: selectedPeriodFilter === 'ALL' ? 'rgba(255,255,255,0.2)' : '#E2E8F0',
+              color: selectedPeriodFilter === 'ALL' ? 'white' : '#64748B'
+            }}>
+              {findings.length}
+            </span>
           </button>
           
           {auditPeriodList.map(period => {
-            const count = findings.filter(f => f.auditPeriod === period).length;
+            const statusInfo = getAuditStatusInfo(period);
             const isSelected = selectedPeriodFilter === period;
             return (
               <button
                 key={period}
                 onClick={() => setSelectedPeriodFilter(period)}
                 style={{
-                  padding: '0.4rem 1rem', borderRadius: '8px', fontSize: '0.8125rem', fontWeight: 700,
+                  padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.8125rem', fontWeight: 700,
                   background: isSelected ? 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)' : '#F8FAFC',
                   color: isSelected ? 'white' : '#475569',
                   border: `1px solid ${isSelected ? '#1565C0' : '#CBD5E1'}`,
                   cursor: 'pointer', transition: 'all 0.2s ease',
-                  display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
                   boxShadow: isSelected ? '0 2px 8px rgba(21, 101, 192, 0.25)' : 'none'
                 }}
               >
@@ -174,7 +253,18 @@ export const VendorFindings: React.FC = () => {
                   background: isSelected ? 'rgba(255,255,255,0.2)' : '#E2E8F0',
                   color: isSelected ? 'white' : '#64748B'
                 }}>
-                  {count}
+                  {statusInfo.total}
+                </span>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  fontSize: '0.6875rem', padding: '0.12rem 0.45rem', borderRadius: '6px',
+                  fontWeight: 700,
+                  ...getStatusBadgeStyle(statusInfo.status, isSelected)
+                }}>
+                  {statusInfo.status === 'Completed' && <CheckCircle2 style={{ width: '10px', height: '10px' }} />}
+                  {statusInfo.status === 'Not Started' && <AlertTriangle style={{ width: '10px', height: '10px' }} />}
+                  {statusInfo.status === 'Not Completed' && <Clock style={{ width: '10px', height: '10px' }} />}
+                  {statusInfo.status}
                 </span>
               </button>
             );
@@ -190,19 +280,33 @@ export const VendorFindings: React.FC = () => {
         }}>
           <div style={{
             padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9', background: '#FAFCFF',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'
           }}>
             <h3 style={{ fontWeight: 700, color: '#0B1F3A', fontSize: '1.05rem', margin: 0 }}>
               {selectedPeriodFilter === 'ALL' ? 'All Audit Findings' : `Findings for ${selectedPeriodFilter}`}
             </h3>
-            <span style={{
-              background: displayedFindings.length > 0 ? '#FEF2F2' : '#ECFDF5',
-              color: displayedFindings.length > 0 ? '#DC2626' : '#059669',
-              border: `1px solid ${displayedFindings.length > 0 ? '#FECACA' : '#A7F3D0'}`,
-              padding: '0.2rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700
-            }}>
-              {displayedFindings.length} Items Found
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                fontSize: '0.725rem', padding: '0.2rem 0.65rem', borderRadius: '999px',
+                fontWeight: 700,
+                ...getStatusBadgeStyle(currentPeriodStatus.status, false)
+              }}>
+                {currentPeriodStatus.status === 'Completed' && <CheckCircle2 style={{ width: '12px', height: '12px' }} />}
+                {currentPeriodStatus.status === 'Not Started' && <AlertTriangle style={{ width: '12px', height: '12px' }} />}
+                {currentPeriodStatus.status === 'Not Completed' && <Clock style={{ width: '12px', height: '12px' }} />}
+                {currentPeriodStatus.status}
+                {currentPeriodStatus.status === 'Not Completed' && ` (${currentPeriodStatus.responded}/${currentPeriodStatus.total})`}
+              </span>
+              <span style={{
+                background: displayedFindings.length > 0 ? '#FEF2F2' : '#ECFDF5',
+                color: displayedFindings.length > 0 ? '#DC2626' : '#059669',
+                border: `1px solid ${displayedFindings.length > 0 ? '#FECACA' : '#A7F3D0'}`,
+                padding: '0.2rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700
+              }}>
+                {displayedFindings.length} Items Found
+              </span>
+            </div>
           </div>
 
           {displayedFindings.length > 0 ? (
@@ -318,7 +422,7 @@ export const VendorFindings: React.FC = () => {
                   </div>
                   {activeFinding.respondedAt && (
                     <div style={{ fontSize: '0.725rem', color: '#94A3B8', textAlign: 'right', marginTop: '0.375rem' }}>
-                      Submitted on {new Date(activeFinding.respondedAt).toLocaleDateString()}
+                      Submitted on {formatDate(activeFinding.respondedAt)}
                     </div>
                   )}
                 </div>

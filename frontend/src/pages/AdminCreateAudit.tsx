@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FileCheck, LayoutDashboard, Building2, Users, UserCheck } from 'lucide-react';
+import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
+import { DateInput } from '../components/DateInput';
+import { 
+  parseFlexibleDate, 
+  formatDate, 
+  AUDIT_MONTHS, 
+  AUDIT_QUARTERS, 
+  AUDIT_HALF_YEARS,
+  calculateAuditCycle 
+} from '../utils/dateUtils';
 
 export const AdminCreateAudit: React.FC = () => {
   const navigate = useNavigate();
@@ -13,13 +22,31 @@ export const AdminCreateAudit: React.FC = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dynamically generate available years (current year and future years)
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const availableYears = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => currentYear + i);
+  }, [currentYear]);
+
+  // Initial calculation for Q1 of current year
+  const initialCycle = useMemo(() => {
+    return calculateAuditCycle('Quarterly', currentYear, 'Q1') || {
+      summary: `Q1 ${currentYear} (Jan–Mar)`,
+      startDate: `${currentYear}-01-01`,
+      dueDate: `${currentYear}-03-31`
+    };
+  }, [currentYear]);
+
   const [formData, setFormData] = useState({
     customerId: '',
     vendorId: '',
     auditorId: '',
-    auditPeriod: 'Q1 2026',
-    startDate: '',
-    dueDate: '',
+    auditFrequency: 'Quarterly',
+    auditYear: currentYear,
+    periodSelection: 'Q1',
+    auditPeriod: initialCycle.summary,
+    startDate: initialCycle.startDate,
+    dueDate: initialCycle.dueDate,
     establishmentType: 'Factory',
     country: 'India',
     state: 'All'
@@ -49,35 +76,133 @@ export const AdminCreateAudit: React.FC = () => {
     fetchData();
   }, []);
 
+  const handleFrequencyChange = (freq: string) => {
+    let newPeriod = formData.periodSelection;
+    if (freq === 'Monthly') {
+      newPeriod = 'January';
+    } else if (freq === 'Quarterly') {
+      newPeriod = 'Q1';
+    } else if (freq === 'Half-Yearly') {
+      newPeriod = 'H1';
+    } else {
+      newPeriod = 'Annual';
+    }
+
+    const cycle = calculateAuditCycle(freq, formData.auditYear, newPeriod);
+    setFormData(prev => ({
+      ...prev,
+      auditFrequency: freq,
+      periodSelection: newPeriod,
+      auditPeriod: cycle?.summary || '',
+      startDate: cycle?.startDate || prev.startDate,
+      dueDate: cycle?.dueDate || prev.dueDate
+    }));
+  };
+
+  const handleYearChange = (yearVal: string | number) => {
+    const y = Number(yearVal);
+    const cycle = calculateAuditCycle(formData.auditFrequency, y, formData.periodSelection);
+    setFormData(prev => ({
+      ...prev,
+      auditYear: y,
+      auditPeriod: cycle?.summary || '',
+      startDate: cycle?.startDate || prev.startDate,
+      dueDate: cycle?.dueDate || prev.dueDate
+    }));
+  };
+
+  const handlePeriodChange = (periodVal: string) => {
+    const cycle = calculateAuditCycle(formData.auditFrequency, formData.auditYear, periodVal);
+    setFormData(prev => ({
+      ...prev,
+      periodSelection: periodVal,
+      auditPeriod: cycle?.summary || '',
+      startDate: cycle?.startDate || prev.startDate,
+      dueDate: cycle?.dueDate || prev.dueDate
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
+
+    if (!formData.auditFrequency || !['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'].includes(formData.auditFrequency)) {
+      setError('Please select a valid audit frequency.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!formData.auditYear || isNaN(Number(formData.auditYear))) {
+      setError('Please select a valid audit year.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.auditFrequency === 'Monthly' && !formData.periodSelection) {
+      setError('Please select a month for the monthly audit cycle.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.auditFrequency === 'Quarterly' && !formData.periodSelection) {
+      setError('Please select a quarter for the quarterly audit cycle.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.auditFrequency === 'Half-Yearly' && !formData.periodSelection) {
+      setError('Please select a half-yearly period.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const cycle = calculateAuditCycle(formData.auditFrequency, formData.auditYear, formData.periodSelection);
+    if (!cycle) {
+      setError('Unable to calculate valid audit cycle. Please check your selections.');
+      setIsSubmitting(false);
+      return;
+    }
     
-    if (new Date(formData.dueDate) < new Date(formData.startDate)) {
-      setError('Due date cannot be before start date.');
+    const sDate = parseFlexibleDate(formData.startDate);
+    const dDate = parseFlexibleDate(formData.dueDate);
+    if (!sDate || !dDate) {
+      setError('Please provide valid start and due dates.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (dDate < sDate) {
+      setError('Compliance due date cannot be before scheduled start date.');
       setIsSubmitting(false);
       return;
     }
 
     try {
       const token = localStorage.getItem('auth_token');
+      const payload = {
+        ...formData,
+        auditPeriod: formData.auditPeriod || cycle.summary,
+        startDate: cycle.startDate,
+        dueDate: cycle.dueDate
+      };
+
       const res = await fetch(`${API_BASE_URL}/admin/audits`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
-        navigate('/admin/audits');
+        navigate('/admin/audits', { state: { newAudit: data.audit } });
       } else {
         setError(data.error || 'Failed to create audit.');
       }
     } catch (err) {
-      setError('An error occurred.');
+      setError('An unexpected error occurred while scheduling the audit.');
     } finally {
       setIsSubmitting(false);
     }
@@ -168,31 +293,130 @@ export const AdminCreateAudit: React.FC = () => {
                   </select>
                 </div>
 
+                {/* A. Audit Frequency */}
                 <div className="admin-form-group">
                   <label className="admin-form-label">
-                    Audit Cycle Period <span className="req">*</span>
+                    Audit Frequency <span className="req">*</span>
                   </label>
                   <select 
                     required 
                     className="admin-form-select" 
-                    value={formData.auditPeriod} 
-                    onChange={e => setFormData({...formData, auditPeriod: e.target.value})}
+                    value={formData.auditFrequency} 
+                    onChange={e => handleFrequencyChange(e.target.value)}
                   >
-                    <option value="Q1 2026">Q1 2026 (Jan - Mar)</option>
-                    <option value="Q2 2026">Q2 2026 (Apr - Jun)</option>
-                    <option value="Q3 2026">Q3 2026 (Jul - Sep)</option>
-                    <option value="Q4 2026">Q4 2026 (Oct - Dec)</option>
-                    <option value="Annual 2026">Annual Comprehensive 2026</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Half-Yearly">Half-Yearly</option>
+                    <option value="Yearly">Yearly</option>
                   </select>
+                </div>
+
+                {/* B. Audit Year */}
+                <div className="admin-form-group">
+                  <label className="admin-form-label">
+                    Audit Year <span className="req">*</span>
+                  </label>
+                  <select 
+                    required 
+                    className="admin-form-select" 
+                    value={formData.auditYear} 
+                    onChange={e => handleYearChange(e.target.value)}
+                  >
+                    {availableYears.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* C. Period Selection (Dynamic based on Frequency) */}
+                {formData.auditFrequency === 'Monthly' && (
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">
+                      Select Month (Period) <span className="req">*</span>
+                    </label>
+                    <select 
+                      required 
+                      className="admin-form-select" 
+                      value={formData.periodSelection} 
+                      onChange={e => handlePeriodChange(e.target.value)}
+                    >
+                      {AUDIT_MONTHS.map(month => (
+                        <option key={month} value={month}>{month}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {formData.auditFrequency === 'Quarterly' && (
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">
+                      Select Quarter (Period) <span className="req">*</span>
+                    </label>
+                    <select 
+                      required 
+                      className="admin-form-select" 
+                      value={formData.periodSelection} 
+                      onChange={e => handlePeriodChange(e.target.value)}
+                    >
+                      {AUDIT_QUARTERS.map(q => (
+                        <option key={q.value} value={q.value}>{q.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {formData.auditFrequency === 'Half-Yearly' && (
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">
+                      Select Half-Yearly Period <span className="req">*</span>
+                    </label>
+                    <select 
+                      required 
+                      className="admin-form-select" 
+                      value={formData.periodSelection} 
+                      onChange={e => handlePeriodChange(e.target.value)}
+                    >
+                      {AUDIT_HALF_YEARS.map(h => (
+                        <option key={h.value} value={h.value}>{h.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Dynamic Cycle Summary Card */}
+                <div className="admin-form-group full-width">
+                  <div style={{
+                    backgroundColor: '#F0F9FF',
+                    border: '1.5px solid #BAE6FD',
+                    borderRadius: '8px',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Calendar style={{ width: '1rem', height: '1rem', color: '#0284C7' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                        Selected Audit Cycle:
+                      </span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0C4A6E' }}>
+                        {formData.auditPeriod}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0284C7' }}>
+                      Auto-calculated Timeline: {formatDate(formData.startDate)} – {formatDate(formData.dueDate)}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="admin-form-group">
                   <label className="admin-form-label">
                     Scheduled Start Date <span className="req">*</span>
                   </label>
-                  <input 
+                  <DateInput 
                     required 
-                    type="date" 
                     className="admin-form-input" 
                     value={formData.startDate} 
                     onChange={e => setFormData({...formData, startDate: e.target.value})} 
@@ -203,9 +427,8 @@ export const AdminCreateAudit: React.FC = () => {
                   <label className="admin-form-label">
                     Compliance Due Date <span className="req">*</span>
                   </label>
-                  <input 
+                  <DateInput 
                     required 
-                    type="date" 
                     className="admin-form-input" 
                     value={formData.dueDate} 
                     onChange={e => setFormData({...formData, dueDate: e.target.value})} 
@@ -286,3 +509,4 @@ export const AdminCreateAudit: React.FC = () => {
     </DashboardLayout>
   );
 };
+

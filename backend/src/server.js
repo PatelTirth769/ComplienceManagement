@@ -15,6 +15,14 @@ try {
 
 const PORT = config.port;
 
+// Start automated daily morning reminder cron job
+try {
+  const { startReminderCron } = require('./services/reminderService');
+  startReminderCron();
+} catch (cronErr) {
+  console.warn('[Reminder Service Warning]: Could not initialize cron job:', cronErr.message);
+}
+
 const server = app.listen(PORT, () => {
   console.log(`==================================================`);
   console.log(`Compliance Calculator API Server running on port ${PORT}`);

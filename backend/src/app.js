@@ -25,8 +25,34 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Parse JSON Payloads
-app.use(express.json({ limit: '10mb' }));
+// Parse JSON Payloads with auto-recovery for unescaped backslashes (e.g. Windows paths, passwords, manual curl/postman payloads)
+app.use(express.text({ type: ['application/json', 'text/json'], limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use((req, res, next) => {
+  if (typeof req.body === 'string') {
+    if (!req.body.trim()) {
+      req.body = {};
+      return next();
+    }
+    try {
+      req.body = JSON.parse(req.body);
+    } catch (err) {
+      try {
+        // Attempt recovery from unescaped backslashes (common in Windows paths, passwords, or manual inputs)
+        const repaired = req.body.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, '\\\\');
+        req.body = JSON.parse(repaired);
+      } catch (repairErr) {
+        const syntaxErr = new SyntaxError(err.message);
+        syntaxErr.status = 400;
+        syntaxErr.body = req.body;
+        return next(syntaxErr);
+      }
+    }
+  } else if (!req.body) {
+    req.body = {};
+  }
+  next();
+});
 app.use(express.urlencoded({ extended: true }));
 
 // Register API Routes

@@ -1,4 +1,8 @@
+const path = require('path');
+const fs = require('fs');
 const { getDb } = require('../config/firebase');
+
+const actRulesFilePath = path.join(__dirname, '../data/actRules.json');
 
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -172,7 +176,13 @@ exports.getMyAudits = async (req, res) => {
     const audits = await Promise.all(rawAudits.map(async (a) => {
       const resolved = await resolveAuditNames(db, a);
       const completionPercentage = excelReportService.getAuditCompletionPercentage(a);
-      return { ...a, ...resolved, completionPercentage };
+      return { 
+        ...a, 
+        ...resolved, 
+        auditType: a.auditType || 'Original',
+        isReadOnly: a.isReadOnly === true,
+        completionPercentage 
+      };
     }));
 
     res.status(200).json({ success: true, data: audits });
@@ -205,7 +215,27 @@ exports.getAuditById = async (req, res) => {
     const scoringService = require('../services/scoringService');
     const checklistService = require('../services/checklistService');
 
-    let fullData = { id: doc.id, ...auditData, ...resolvedNames };
+    let actRulesSnapshot = auditData.actRules;
+    if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
+      if (fs.existsSync(actRulesFilePath)) {
+        try {
+          actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+        } catch (e) {
+          actRulesSnapshot = [];
+        }
+      } else {
+        actRulesSnapshot = [];
+      }
+    }
+
+    let fullData = { 
+      id: doc.id, 
+      ...auditData, 
+      ...resolvedNames,
+      auditType: auditData.auditType || 'Original',
+      isReadOnly: auditData.isReadOnly === true,
+      actRules: actRulesSnapshot
+    };
 
     if ((!fullData.categoryScores || fullData.categoryScores.length === 0 || !fullData.critical) && fullData.responses && Array.isArray(fullData.responses) && fullData.responses.length > 0) {
       try {
@@ -274,6 +304,16 @@ exports.uploadDocument = async (req, res) => {
 
     const fileBuffer = Buffer.from(base64String, 'base64');
     const fileSize = fileBuffer.length;
+
+    // Validate 5 MB maximum file size limit (5 * 1024 * 1024 bytes)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (fileSize > MAX_FILE_SIZE) {
+      return res.status(413).json({ 
+        success: false, 
+        error: 'Max size limit is 5MB' 
+      });
+    }
+
     const docId = `doc_${uuidv4()}`;
     const s3Key = `audits/${auditId}/documents/${vendorId}/${docId}_${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
@@ -404,11 +444,11 @@ exports.getFindings = async (req, res) => {
             index: index,
             itemId: item.itemId || item.id || null,
             auditId: doc.id,
-            auditPeriod: data.auditPeriod || 'N/A',
+            auditPeriod: (data.auditPeriod || data.auditMonth || 'N/A').replace(/[\u2010-\u2015]/g, '-'),
             category: category,
             item: itemText,
             remarks: item.remarks || '',
-            status: item.vendorResponse ? 'Responded' : 'Open',
+            status: (item.vendorResponse && String(item.vendorResponse).trim().length > 0) ? 'Responded' : 'Open',
             vendorResponse: item.vendorResponse || null,
             respondedAt: item.respondedAt || null,
             createdAt: data.createdAt

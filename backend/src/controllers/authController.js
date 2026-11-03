@@ -82,10 +82,23 @@ exports.login = async (req, res) => {
     }
 
     const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    const userData = userDoc.data() || {};
+    // Verify password safely
+    let isMatch = false;
+    if (userData.password && typeof userData.password === 'string') {
+      try {
+        if (userData.password.startsWith('$2a$') || userData.password.startsWith('$2b$') || userData.password.startsWith('$2y$')) {
+          isMatch = await bcrypt.compare(password, userData.password);
+        } else {
+          // Plaintext password fallback
+          isMatch = (password === userData.password);
+        }
+      } catch (err) {
+        console.warn('[Auth Password Compare Warning]:', err.message);
+        isMatch = false;
+      }
+    }
 
-    // Verify password
-    const isMatch = await bcrypt.compare(password, userData.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }

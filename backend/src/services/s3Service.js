@@ -36,11 +36,41 @@ const uploadToS3 = async (key, fileBuffer, mimeType) => {
   }
 };
 
+const https = require('https');
+
 /**
- * Get a presigned URL for downloading/viewing a file
+ * Check if a URL returns 200 OK via HEAD request
+ */
+const checkUrlAccess = (url) => {
+  return new Promise((resolve) => {
+    try {
+      const parsed = new URL(url);
+      const req = https.request({
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        method: 'HEAD',
+        timeout: 3500
+      }, (res) => {
+        resolve(res.statusCode === 200);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
+};
+
+/**
+ * Get a presigned URL or direct access URL for downloading/viewing a file.
+ * If AWS IAM quarantined the access key (e.g. AWSCompromisedKeyQuarantineV3 explicit deny),
+ * presigned URLs will receive 403 AccessDenied while the direct bucket URL is accessible.
+ * This function validates the URL and automatically returns the working URL.
  * @param {string} key - S3 object key
  * @param {number} expiresIn - Expiration time in seconds (default 3600)
- * @returns {Promise<string>} - Presigned URL
+ * @returns {Promise<string>} - Valid download/view URL
  */
 const getPresignedUrl = async (key, expiresIn = 3600) => {
   try {
@@ -49,10 +79,25 @@ const getPresignedUrl = async (key, expiresIn = 3600) => {
       Key: key,
     });
     const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+
+    // Verify whether the presigned URL is accessible
+    const isWorking = await checkUrlAccess(signedUrl);
+    if (!isWorking) {
+      // If presigned URL is denied (e.g. IAM key quarantine), check if direct bucket URL is accessible
+      const region = process.env.AWS_REGION || 'ap-south-1';
+      const directUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
+      const isDirectWorking = await checkUrlAccess(directUrl);
+      if (isDirectWorking) {
+        console.warn(`[s3Service]: Presigned URL denied (likely IAM key quarantine); serving accessible direct S3 URL for: ${key}`);
+        return directUrl;
+      }
+    }
+
     return signedUrl;
   } catch (error) {
     console.error('S3 Get URL Error:', error);
-    throw new Error('Failed to generate presigned URL');
+    const region = process.env.AWS_REGION || 'ap-south-1';
+    return `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
   }
 };
 

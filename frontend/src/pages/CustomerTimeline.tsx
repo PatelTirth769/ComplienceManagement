@@ -7,6 +7,7 @@ import {
   AlertCircle, CheckCircle2, Circle, AlertTriangle, ArrowRight, FileText, User, Shield, Presentation, FileBarChart
 } from 'lucide-react';
 import { getCustomerTimeline } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 const STANDARD_MILESTONES = [
   { id: 'REGISTRATION', title: 'Vendor Registration', description: 'Vendor account created and assigned' },
@@ -133,14 +134,14 @@ export const CustomerTimeline: React.FC = () => {
       const matchingEvent = timelineEvents.find((e: any) => e.event && e.event.toLowerCase().includes(STANDARD_MILESTONES[milestoneIndex].title.toLowerCase()));
       return {
         state: 'COMPLETED',
-        date: matchingEvent ? new Date(matchingEvent.timestamp).toLocaleDateString() : 'Completed',
+        date: matchingEvent ? formatDate(matchingEvent.timestamp) : 'Completed',
         notes: matchingEvent ? matchingEvent.notes : ''
       };
     } else if (milestoneIndex === activeIndex) {
       const matchingEvent = timelineEvents[timelineEvents.length - 1];
       return {
         state: 'CURRENT',
-        date: matchingEvent ? new Date(matchingEvent.timestamp).toLocaleDateString() : 'Active Stage',
+        date: matchingEvent ? formatDate(matchingEvent.timestamp) : 'Active Stage',
         notes: matchingEvent ? matchingEvent.notes : ''
       };
     } else {
@@ -469,7 +470,7 @@ export const CustomerTimeline: React.FC = () => {
                       <div key={idx} style={{ padding: '0.625rem 0.875rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: '0.775rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0B1F3A' }}>
                           <span>{event.event || 'Audit Event'}</span>
-                          <span style={{ color: '#64748B', fontWeight: 500, fontSize: '0.725rem' }}>{new Date(event.timestamp).toLocaleString()}</span>
+                          <span style={{ color: '#64748B', fontWeight: 500, fontSize: '0.725rem' }}>{formatDateTime(event.timestamp)}</span>
                         </div>
                         {event.notes && <div style={{ color: '#475569', marginTop: '2px' }}>{event.notes}</div>}
                         <div style={{ color: '#94A3B8', fontSize: '0.7rem', marginTop: '2px' }}>Performed by: {event.actor || 'System'}</div>

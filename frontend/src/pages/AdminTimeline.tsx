@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 
 export const AdminTimeline: React.FC = () => {
   const [audits, setAudits] = useState<any[]>([]);
@@ -127,7 +128,7 @@ export const AdminTimeline: React.FC = () => {
                     </div>
                     <div>
                       <div className="font-bold text-slate-900">1. Audit Scheduled</div>
-                      <div className="text-[11px] text-slate-400">{new Date(audit.startDate || audit.createdAt || Date.now()).toLocaleDateString()}</div>
+                      <div className="text-[11px] text-slate-400">{formatDate(audit.startDate || audit.createdAt || Date.now())}</div>
                     </div>
                   </div>
 

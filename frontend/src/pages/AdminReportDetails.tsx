@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, ClipboardList, BarChart3, Download, Loader2 } from 'lucide-react';
+import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, ClipboardList, BarChart3, Download, Loader2, Scale, X } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
+import { formatDate } from '../utils/dateUtils';
+import { findActRule, getDisplayLaw } from '../utils/actLawMatcher';
 
 export const AdminReportDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [audit, setAudit] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [usersMap, setUsersMap] = useState<Record<string, string>>({});
+  const [activeLawModal, setActiveLawModal] = useState<{ item: any; law: any } | null>(null);
 
   const sidebarItems = getAdminSidebarItems('Reports');
 
@@ -23,6 +26,7 @@ export const AdminReportDetails: React.FC = () => {
           fetch(`${API_BASE_URL}/admin/users?role=vendor`, { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch(`${API_BASE_URL}/admin/users?role=auditor`, { headers: { 'Authorization': `Bearer ${token}` } }),
         ]);
+
 
         const auditData = await auditRes.json();
         if (auditData.success) {
@@ -92,6 +96,12 @@ export const AdminReportDetails: React.FC = () => {
   );
   const totalApplicable = audit.totalApplicable ?? summary.applicableItems ?? (compliantCount + nonCompliantCount);
 
+  const actRules: any[] = audit.actRules || [];
+
+  const getActLaw = (item: any) => {
+    return findActRule(item, actRules);
+  };
+
   return (
     <DashboardLayout title={`Audit Report - ${audit.auditIdString}`} sidebarItems={sidebarItems} backUrl="/admin/reports" backLabel="Back to Reports">
       {/* 1. Header */}
@@ -127,7 +137,7 @@ export const AdminReportDetails: React.FC = () => {
             Audit Period: <strong style={{ color: '#0F172A' }}>{audit.auditPeriod}</strong> · ID: <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{audit.auditIdString}</strong>
           </p>
           <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: 0 }}>
-            Conducted between {new Date(audit.startDate).toLocaleDateString()} and {new Date(audit.dueDate).toLocaleDateString()}
+            Conducted between {formatDate(audit.startDate)} and {formatDate(audit.dueDate)}
           </p>
         </div>
 
@@ -238,10 +248,28 @@ export const AdminReportDetails: React.FC = () => {
                     const isComp = statusStr === 'compliant';
                     const isNa = statusStr === 'na';
                     const itemId = resp.itemId || `ITEM-${idx + 1}`;
+                    const matchedLaw = getActLaw(resp);
+                    const lawDescription = (matchedLaw?.description || '').trim();
 
                     return (
                       <tr key={itemId}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F172A' }}>{itemId}</td>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F172A', verticalAlign: 'top' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                            <span>{itemId}</span>
+                            <button
+                              type="button"
+                              className={`badge-law-btn ${lawDescription ? 'has-rule' : ''} no-print`}
+                              onClick={() => {
+                                const lawToDisplay = getDisplayLaw(resp, matchedLaw);
+                                setActiveLawModal({ item: resp, law: lawToDisplay });
+                              }}
+                              title={`View Law & Statutory Rule for ${matchedLaw?.shortName || resp.type || 'this Act'}`}
+                            >
+                              <Scale className="w-3 h-3 mr-1 inline-block" />
+                              <span>Law</span>
+                            </button>
+                          </div>
+                        </td>
                         <td>{resp.title || resp.particulars || `Statutory requirement #${itemId} verification`}</td>
                         <td style={{ textAlign: 'center' }}>
                           <span className={`db-badge ${isComp ? 'completed' : isNa ? 'neutral' : 'pending'}`}>
@@ -260,6 +288,74 @@ export const AdminReportDetails: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Statutory Law Modal for this Act */}
+      {activeLawModal && (
+        <div className="law-modal-overlay" onClick={() => setActiveLawModal(null)}>
+          <div className="law-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="law-modal-header">
+              <div className="flex items-center gap-2.5">
+                <div className="law-modal-icon-badge">
+                  <Scale className="w-5 h-5 text-[#1565C0]" />
+                </div>
+                <div>
+                  <div className="law-modal-act-code">{activeLawModal.law?.shortName || activeLawModal.item?.type || 'Statutory Act'}</div>
+                  <h3 className="law-modal-act-title">{activeLawModal.law?.actName || activeLawModal.item?.type || 'Statutory Act Law'}</h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="law-modal-close-btn"
+                onClick={() => setActiveLawModal(null)}
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="law-modal-body">
+              {activeLawModal.law?.category && (
+                <div className="law-modal-category">
+                  <span className="law-category-pill">{activeLawModal.law.category}</span>
+                </div>
+              )}
+
+              <div className="law-modal-content-card">
+                <div className="law-content-heading">Statutory Rule / Law Mandate:</div>
+                {activeLawModal.law?.description?.trim() ? (
+                  <div className="law-content-text">{activeLawModal.law.description.trim()}</div>
+                ) : (
+                  <div className="law-content-empty">
+                    <p>No statutory law description was configured for this Act during this audit.</p>
+                    <span className="law-content-subtext">Admin can write and save rules in Admin Console &gt; Rules for future audits.</span>
+                  </div>
+                )}
+              </div>
+
+              {activeLawModal.law?.states && activeLawModal.law.states.length > 0 && (
+                <div className="law-modal-states">
+                  <span className="law-states-title">Applicable Jurisdiction:</span>
+                  <div className="law-states-tags">
+                    {activeLawModal.law.states.map((st: string, i: number) => (
+                      <span key={i} className="law-state-chip">{st}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="law-modal-footer">
+              <button
+                type="button"
+                className="law-modal-done-btn"
+                onClick={() => setActiveLawModal(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @media print {

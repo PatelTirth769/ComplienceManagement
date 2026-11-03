@@ -1,6 +1,6 @@
 import { 
   LayoutDashboard, Building2, Users, UserCheck, 
-  FileCheck, ClipboardList, BarChart3 
+  FileCheck, ClipboardList, BarChart3, Scale, MessageSquareQuote 
 } from 'lucide-react';
 
 export interface SidebarItem {
@@ -18,4 +18,6 @@ export const getAdminSidebarItems = (activeName: string): SidebarItem[] => [
   { name: 'Audits', icon: FileCheck, active: activeName === 'Audits', path: '/admin/audits' },
   { name: 'Checklist', icon: ClipboardList, active: activeName === 'Checklist', path: '/admin/checklist' },
   { name: 'Reports', icon: BarChart3, active: activeName === 'Reports', path: '/admin/reports' },
+  { name: 'Rules', icon: Scale, active: activeName === 'Rules', path: '/admin/rules' },
+  { name: 'Interview', icon: MessageSquareQuote, active: activeName === 'Interview' || activeName === 'Inverview', path: '/admin/interview' },
 ];

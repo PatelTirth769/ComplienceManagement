@@ -6,6 +6,7 @@ import {
   CheckCircle2, PlayCircle, Calendar, ArrowRight, ShieldCheck, UserCheck, Building2, Layers
 } from 'lucide-react';
 import { getVendorDashboardStats, getVendorAudits, getAuditorContact } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 
 interface Milestone {
   id: number;
@@ -138,13 +139,13 @@ export const VendorTimeline: React.FC = () => {
         (t.status || '').toLowerCase().includes(m.key)
       );
       if (match && match.timestamp) {
-        date = new Date(match.timestamp).toLocaleDateString();
+        date = formatDate(match.timestamp);
       }
     }
 
     // Fallback date for completed milestones if not explicitly in timeline array
     if (!date && state === 'COMPLETED' && activeAudit?.createdAt) {
-      date = new Date(activeAudit.createdAt).toLocaleDateString();
+      date = formatDate(activeAudit.createdAt);
     }
 
     return { ...m, state, date };
@@ -280,11 +281,11 @@ export const VendorTimeline: React.FC = () => {
           </div>
           <div>
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.725rem', fontWeight: 600, textTransform: 'uppercase' }}>Start Date</div>
-            <div style={{ fontWeight: 700, marginTop: '2px' }}>{activeAudit?.startDate || 'N/A'}</div>
+            <div style={{ fontWeight: 700, marginTop: '2px' }}>{formatDate(activeAudit?.startDate) || 'N/A'}</div>
           </div>
           <div>
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.725rem', fontWeight: 600, textTransform: 'uppercase' }}>Due Date</div>
-            <div style={{ fontWeight: 700, marginTop: '2px' }}>{activeAudit?.dueDate || 'N/A'}</div>
+            <div style={{ fontWeight: 700, marginTop: '2px' }}>{formatDate(activeAudit?.dueDate) || 'N/A'}</div>
           </div>
         </div>
       </div>

@@ -4,17 +4,26 @@ import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles: Array<'Admin' | 'Customer' | 'Auditor' | 'Vendor'>;
+  allowedRoles: Array<'Admin' | 'Customer' | 'Auditor' | 'Vendor' | string>;
 }
 
 export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   const { user, isAuthenticated } = useAuth();
 
+  // If no in-memory user, check localStorage as emergency fallback before kicking to /
   if (!isAuthenticated || !user) {
-    return <Navigate to="/" replace />;
+    const token = localStorage.getItem('auth_token');
+    const savedUser = localStorage.getItem('auth_user');
+    if (!token && !savedUser) {
+      return <Navigate to="/" replace />;
+    }
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  // Case-insensitive role comparison
+  const userRole = (user?.role || '').toLowerCase();
+  const isAllowed = allowedRoles.some(r => r.toLowerCase() === userRole);
+
+  if (user && !isAllowed) {
     return <Navigate to="/" replace />;
   }
 

@@ -1,0 +1,321 @@
+[
+  {
+    "id": "ACT-CLRA",
+    "actName": "The Contract Labour (Regulation and Abolition) Act, 1970",
+    "shortName": "CLRA Act",
+    "category": "Labour & Employment Regulations",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 10,
+    "description": "hello",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-SE",
+    "actName": "The Shops and Commercial Establishments Act & Rules",
+    "shortName": "S&E Act",
+    "category": "Establishment & Working Conditions",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 23,
+    "description": "iuyiuy",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-MB",
+    "actName": "The Maternity Benefit Act, 1961 & Rules",
+    "shortName": "MB Act",
+    "category": "Social Security & Maternity Welfare",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 9,
+    "description": "iuy",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-MW",
+    "actName": "The Minimum Wages Act, 1948 & Rules",
+    "shortName": "MW Act",
+    "category": "Wages & Remuneration",
+    "states": [
+      "Haryana",
+      "Madhya Pradesh",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 7,
+    "description": "iuy",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-LWF",
+    "actName": "The Labour Welfare Fund Act & Rules",
+    "shortName": "LWF Act",
+    "category": "Employee Welfare & Social Security",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana"
+    ],
+    "formsCount": 8,
+    "description": "iuy",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-POB",
+    "actName": "The Payment of Bonus Act, 1965 & Rules",
+    "shortName": "PoB Act",
+    "category": "Bonus & Profit Sharing",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 2,
+    "description": "iuy",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-EMP-EXC",
+    "actName": "The Employment Exchanges (Compulsory Notification of Vacancies) Act, 1959",
+    "shortName": "Emp. Exc. Act",
+    "category": "Recruitment & Vacancy Reporting",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 2,
+    "description": "iuyoi",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-CLPR",
+    "actName": "The Child Labour (Prohibition and Regulation) Act, 1986 & Rules",
+    "shortName": "CL (P&R) Act",
+    "category": "Child Labour Prohibition",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 2,
+    "description": "oi",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-POSH",
+    "actName": "The Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013",
+    "shortName": "SHWW / POSH Act",
+    "category": "Workplace Safety & Anti-Harassment",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 1,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-ER",
+    "actName": "The Equal Remuneration Act, 1976 & Rules",
+    "shortName": "ER Act",
+    "category": "Gender Equality & Wages",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 1,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.907Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-POW",
+    "actName": "The Payment of Wages Act, 1936 & Rules",
+    "shortName": "PoW Act",
+    "category": "Wage Disbursal & Timelines",
+    "states": [
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 4,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-EC",
+    "actName": "The Employees Compensation Act, 1923 (Workmen Compensation)",
+    "shortName": "EC Act",
+    "category": "Accident & Injury Compensation",
+    "states": [
+      "Madhya Pradesh",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 1,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-NF",
+    "actName": "The National and Festival Holidays Act & Rules",
+    "shortName": "N&F Act",
+    "category": "Leaves & Statutory Holidays",
+    "states": [
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 3,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-HRA",
+    "actName": "The Maharashtra Workmen Minimum House Rent Allowance Act, 1990 & Rules",
+    "shortName": "HRA Act",
+    "category": "Allowances & Benefits",
+    "states": [
+      "Maharashtra"
+    ],
+    "formsCount": 1,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-FACTORIES",
+    "actName": "The Factories Act, 1948 & Rules",
+    "shortName": "Factories Act",
+    "category": "Factory Safety & Health",
+    "states": [
+      "Telangana"
+    ],
+    "formsCount": 1,
+    "description": "poi",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-EPF",
+    "actName": "The Employees Provident Funds and Miscellaneous Provisions Act, 1952 & Schemes (EPF & EDLI)",
+    "shortName": "PF Act",
+    "category": "Social Security & Retirement Benefits",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 5,
+    "description": "m",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-ESI",
+    "actName": "The Employees State Insurance Act, 1948 & Regulations",
+    "shortName": "ESI Act",
+    "category": "Social Security & Healthcare Benefits",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 6,
+    "description": "m",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-PT",
+    "actName": "The Professional Tax (State Enactments) Act & Rules",
+    "shortName": "Pr. Tax Act",
+    "category": "State Tax & Local Remittances",
+    "states": [
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana"
+    ],
+    "formsCount": 3,
+    "description": "m",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  },
+  {
+    "id": "ACT-PSARA",
+    "actName": "The Private Security Agencies (Regulation) Act, 2005 & Rules (PSARA / PSRGA)",
+    "shortName": "PSRGA / PSARA Act",
+    "category": "Security & Agency Licensing",
+    "states": [
+      "Haryana",
+      "Karnataka",
+      "Madhya Pradesh",
+      "Maharashtra",
+      "Telangana",
+      "Uttar Pradesh"
+    ],
+    "formsCount": 4,
+    "description": "m",
+    "updatedAt": "2026-11-02T04:41:24.908Z",
+    "updatedBy": "aa@gmail.com"
+  }
+]
