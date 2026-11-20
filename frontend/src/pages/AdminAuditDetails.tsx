@@ -4,6 +4,7 @@ import { Loader2, CheckCircle2, Circle, FileText } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
+import { formatDate } from '../utils/dateUtils';
 
 export const AdminAuditDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -146,6 +147,36 @@ export const AdminAuditDetails: React.FC = () => {
           <div className="flex items-center gap-3">
             <h1 className="admin-header-title">{audit.auditIdString}</h1>
             <span className="audit-id-badge">Cycle {audit.auditPeriod}</span>
+            <span 
+              className="db-badge" 
+              style={{
+                backgroundColor: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#F3E8FF' : '#F1F5F9',
+                color: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#7E22CE' : '#334155',
+                border: `1px solid ${audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#D8B4FE' : '#CBD5E1'}`,
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                padding: '4px 8px',
+                borderRadius: '6px'
+              }}
+            >
+              {audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? 'Re-Audit' : 'Original Audit'}
+            </span>
+            {audit.isReadOnly && (
+              <span 
+                className="db-badge" 
+                style={{
+                  backgroundColor: '#FEF3C7',
+                  color: '#92400E',
+                  border: '1px solid #FDE68A',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  padding: '4px 8px',
+                  borderRadius: '6px'
+                }}
+              >
+                Read-Only
+              </span>
+            )}
             <span className={`score-badge-pill ${scoreBadgeClass}`}>
               {audit.status}
             </span>
@@ -188,16 +219,22 @@ export const AdminAuditDetails: React.FC = () => {
                   <span className="audit-meta-val">{auditorDisplay}</span>
                 </div>
                 <div className="audit-meta-item">
+                  <span className="audit-meta-label">Audit Type</span>
+                  <span className="audit-meta-val" style={{ fontWeight: 700, color: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#7E22CE' : '#0B1F3A' }}>
+                    {audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? 'Re-Audit' : 'Original'} {audit.isReadOnly ? '(Read-Only)' : ''}
+                  </span>
+                </div>
+                <div className="audit-meta-item">
                   <span className="audit-meta-label">Establishment Type</span>
                   <span className="audit-meta-val">{audit.establishmentType || 'Industrial Factory'}</span>
                 </div>
                 <div className="audit-meta-item">
                   <span className="audit-meta-label">Scheduled Start</span>
-                  <span className="audit-meta-val">{new Date(audit.startDate).toLocaleDateString()}</span>
+                  <span className="audit-meta-val">{formatDate(audit.startDate)}</span>
                 </div>
                 <div className="audit-meta-item">
                   <span className="audit-meta-label">Target Due Date</span>
-                  <span className="audit-meta-val">{new Date(audit.dueDate).toLocaleDateString()}</span>
+                  <span className="audit-meta-val">{formatDate(audit.dueDate)}</span>
                 </div>
               </div>
             </div>
@@ -354,7 +391,7 @@ export const AdminAuditDetails: React.FC = () => {
                                         )}
                                         {f.respondedAt && (
                                           <div style={{ color: '#94A3B8', fontSize: '0.675rem', marginTop: '2px' }}>
-                                            Responded: {new Date(f.respondedAt).toLocaleDateString()}
+                                            Responded: {formatDate(f.respondedAt)}
                                           </div>
                                         )}
                                       </div>
@@ -414,7 +451,11 @@ export const AdminAuditDetails: React.FC = () => {
                   )}
                 </div>
 
-                {!isCompleted ? (
+                {audit.isReadOnly ? (
+                  <div style={{ marginTop: '0.5rem', padding: '0.625rem 0.85rem', borderRadius: '6px', background: '#FEF3C7', border: '1px solid #FCD34D', color: '#92400E', fontSize: '0.75rem', fontWeight: 700, textAlign: 'center', lineHeight: 1.4 }}>
+                    🔒 This Original Audit is Read-Only because a Re-Audit was conducted. Sign-off and final governance is conducted on the Re-Audit docket.
+                  </div>
+                ) : !isCompleted ? (
                   <button
                     onClick={handleSignOff}
                     className="db-btn db-btn-primary"
@@ -449,7 +490,7 @@ export const AdminAuditDetails: React.FC = () => {
                   </div>
                   <div className="timeline-content">
                     <h4 className="timeline-title">Audit Scheduled</h4>
-                    <p className="timeline-desc">{new Date(audit.createdAt).toLocaleDateString()}</p>
+                    <p className="timeline-desc">{formatDate(audit.createdAt)}</p>
                   </div>
                 </div>
                 

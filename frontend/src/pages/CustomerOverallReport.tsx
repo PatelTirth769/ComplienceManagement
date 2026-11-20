@@ -246,135 +246,208 @@ export const CustomerOverallReport: React.FC = () => {
 
   return (
     <DashboardLayout title="Customer Portal" sidebarItems={sidebarItems}>
-      <div style={{ padding: '24px', backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .overall-kpi-card {
+          background: #FFFFFF;
+          border-radius: 12px;
+          padding: 0.85rem 1rem 0.75rem;
+          border: 1.5px solid #E2E8F0;
+          box-shadow: 0 1px 3px rgba(11, 31, 58, 0.03);
+          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: 96px;
+        }
+        .overall-kpi-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(11, 31, 58, 0.07);
+          border-color: #CBD5E1;
+        }
+        .overall-audit-card {
+          background: #FFFFFF;
+          border-radius: 14px;
+          border: 1px solid #E2E8F0;
+          box-shadow: 0 1px 4px rgba(11, 31, 58, 0.03);
+          overflow: hidden;
+          margin-bottom: 1.25rem;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .overall-audit-card:hover {
+          border-color: #CBD5E1;
+          box-shadow: 0 4px 12px rgba(11, 31, 58, 0.05);
+        }
+        .filter-select-input {
+          padding: 0.5rem 0.75rem;
+          border-radius: 8px;
+          border: 1px solid #CBD5E1;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: #1E293B;
+          background-color: #FFFFFF;
+          cursor: pointer;
+          outline: none;
+          transition: all 0.15s ease;
+        }
+        .filter-select-input:hover {
+          border-color: #94A3B8;
+        }
+        .filter-select-input:focus {
+          border-color: #1565C0;
+          box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.1);
+        }
+      `}</style>
+
+      <div style={{ padding: '1.5rem', backgroundColor: '#F8FAFC', minHeight: '100vh', animation: 'fadeIn 0.3s ease' }}>
         
         {/* PAGE HEADER */}
-        <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
-            Overall Report
-          </h1>
-          <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px', margin: 0 }}>
-            View consolidated audit-wise vendor compliance performance.
-          </p>
+        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0B1F3A', margin: 0, letterSpacing: '-0.02em' }}>
+              Overall Report
+            </h1>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.25rem', margin: 0 }}>
+              Consolidated audit-wise vendor compliance performance and historical tracking.
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1565C0', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.35rem 0.75rem', borderRadius: '999px' }}>
+              {summary.totalAudits} Audit Sessions
+            </span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#047857', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '0.35rem 0.75rem', borderRadius: '999px' }}>
+              {summary.totalVendors} Associated Vendors
+            </span>
+          </div>
         </div>
 
-        {/* SUMMARY CARDS */}
+        {/* SUMMARY KPI CARDS */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px',
-          marginBottom: '28px'
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '1rem',
+          marginBottom: '1.25rem'
         }}>
           {/* Card 1: Total Audits */}
-          <div style={{
-            backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '20px',
-            border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Total Audits
-              </span>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileCheck size={20} color="#1565C0" />
+          <div className="overall-kpi-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Total Audits
+                </span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0B1F3A', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                  {summary.totalAudits}
+                </div>
+              </div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <FileCheck size={16} color="#1565C0" />
               </div>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A' }}>
-              {summary.totalAudits}
+            <div style={{ marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: '1px solid #F1F5F9' }}>
+              <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500, display: 'block' }}>
+                Active Audit Periods
+              </span>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>Audit Sessions</span>
           </div>
 
           {/* Card 2: Total Vendors */}
-          <div style={{
-            backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '20px',
-            border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Total Vendors
-              </span>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#F0FDFA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Building2 size={20} color="#0D9488" />
+          <div className="overall-kpi-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Total Vendors
+                </span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0B1F3A', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                  {summary.totalVendors}
+                </div>
+              </div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%)', border: '1px solid #99F6E4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Building2 size={16} color="#0D9488" />
               </div>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A' }}>
-              {summary.totalVendors}
+            <div style={{ marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: '1px solid #F1F5F9' }}>
+              <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500, display: 'block' }}>
+                Assigned Vendors
+              </span>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>Associated Vendors</span>
           </div>
 
           {/* Card 3: Completed Audits */}
-          <div style={{
-            backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '20px',
-            border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Completed Audits
-              </span>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle2 size={20} color="#047857" />
+          <div className="overall-kpi-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#065F46', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Completed Audits
+                </span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#047857', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                  {summary.completedAudits}
+                </div>
+              </div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '1px solid #A7F3D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <CheckCircle2 size={16} color="#047857" />
               </div>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A' }}>
-              {summary.completedAudits}
+            <div style={{ marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: '1px solid #F1F5F9' }}>
+              <span style={{ fontSize: '0.7rem', color: '#065F46', fontWeight: 500, display: 'block' }}>
+                Closed & Evaluated
+              </span>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>Closed / Evaluated</span>
           </div>
 
           {/* Card 4: Average Score */}
-          <div style={{
-            backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '20px',
-            border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Average Compliance
-              </span>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BarChart3 size={20} color="#B45309" />
+          <div className="overall-kpi-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Average Compliance
+                </span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: summary.averageComplianceScore !== null && summary.averageComplianceScore >= 80 ? '#047857' : summary.averageComplianceScore !== null && summary.averageComplianceScore >= 50 ? '#B45309' : '#DC2626', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                  {summary.averageComplianceScore !== null ? `${summary.averageComplianceScore}%` : 'N/A'}
+                </div>
+              </div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <BarChart3 size={16} color="#B45309" />
               </div>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: summary.averageComplianceScore !== null && summary.averageComplianceScore >= 80 ? '#047857' : '#0F172A' }}>
-              {summary.averageComplianceScore !== null ? `${summary.averageComplianceScore}%` : 'N/A'}
+            <div style={{ marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: '1px solid #F1F5F9' }}>
+              <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500, display: 'block' }}>
+                Single Source of Truth
+              </span>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>Single Source of Truth Score</span>
           </div>
         </div>
 
         {/* CONTROLS BAR: SEARCH, FILTERS, SORT */}
         <div style={{
-          backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '18px',
-          border: '1px solid #E2E8F0', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '1rem 1.25rem',
+          border: '1px solid #E2E8F0', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(11, 31, 58, 0.03)'
         }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between' }}>
             
             {/* Search Input */}
-            <div style={{ position: 'relative', minWidth: '260px', flex: '1' }}>
-              <Search size={18} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <div style={{ position: 'relative', minWidth: '240px', flex: '1' }}>
+              <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
                 placeholder="Search Audit ID, Period, Vendor Name or ID..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 style={{
-                  width: '100%', paddingLeft: '38px', paddingRight: '12px', paddingTop: '9px', paddingBottom: '9px',
-                  borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', outline: 'none', color: '#0F172A'
+                  width: '100%', paddingLeft: '2.25rem', paddingRight: '0.75rem', paddingTop: '0.5rem', paddingBottom: '0.5rem',
+                  borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.8125rem', outline: 'none', color: '#0F172A',
+                  background: '#FFFFFF'
                 }}
               />
             </div>
 
             {/* Filter Dropdowns */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem', alignItems: 'center' }}>
               
               {/* Filter: Period */}
               <select
                 value={selectedPeriod}
                 onChange={e => setSelectedPeriod(e.target.value)}
-                style={{
-                  padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1',
-                  fontSize: '13px', color: '#334155', backgroundColor: '#FFFFFF', cursor: 'pointer'
-                }}
+                className="filter-select-input"
               >
                 <option value="ALL">All Periods</option>
                 {availablePeriods.map(p => (
@@ -386,10 +459,7 @@ export const CustomerOverallReport: React.FC = () => {
               <select
                 value={selectedVendor}
                 onChange={e => setSelectedVendor(e.target.value)}
-                style={{
-                  padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1',
-                  fontSize: '13px', color: '#334155', backgroundColor: '#FFFFFF', cursor: 'pointer'
-                }}
+                className="filter-select-input"
               >
                 <option value="ALL">All Vendors</option>
                 {availableVendors.map(v => (
@@ -401,10 +471,7 @@ export const CustomerOverallReport: React.FC = () => {
               <select
                 value={selectedStatus}
                 onChange={e => setSelectedStatus(e.target.value)}
-                style={{
-                  padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1',
-                  fontSize: '13px', color: '#334155', backgroundColor: '#FFFFFF', cursor: 'pointer'
-                }}
+                className="filter-select-input"
               >
                 <option value="ALL">All Statuses</option>
                 {availableStatuses.map(s => (
@@ -416,10 +483,8 @@ export const CustomerOverallReport: React.FC = () => {
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
-                style={{
-                  padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1',
-                  fontSize: '13px', color: '#334155', backgroundColor: '#F8FAFC', fontWeight: 500, cursor: 'pointer'
-                }}
+                className="filter-select-input"
+                style={{ background: '#F8FAFC' }}
               >
                 <option value="PERIOD_DESC">Sort: Period (Latest)</option>
                 <option value="PERIOD_ASC">Sort: Period (Oldest)</option>
@@ -432,12 +497,12 @@ export const CustomerOverallReport: React.FC = () => {
                 <button
                   onClick={clearFilters}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '9px 14px', borderRadius: '8px', border: '1px solid #FECACA',
-                    backgroundColor: '#FEF2F2', color: '#991B1B', fontSize: '13px', fontWeight: 600, cursor: 'pointer'
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid #FECACA',
+                    backgroundColor: '#FEF2F2', color: '#991B1B', fontSize: '0.775rem', fontWeight: 700, cursor: 'pointer'
                   }}
                 >
-                  <RotateCcw size={14} /> Clear Filters
+                  <RotateCcw size={13} /> Clear
                 </button>
               )}
             </div>
@@ -448,22 +513,22 @@ export const CustomerOverallReport: React.FC = () => {
         {/* AUDIT-WISE GROUPING LIST */}
         {filteredAudits.length === 0 ? (
           <div style={{
-            backgroundColor: '#FFFFFF', borderRadius: '12px', padding: '48px 24px',
-            textAlign: 'center', border: '1px solid #E2E8F0', marginTop: '20px'
+            backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '3.5rem 1.5rem',
+            textAlign: 'center', border: '1px solid #E2E8F0', marginTop: '1rem'
           }}>
-            <FileCheck size={48} color="#94A3B8" style={{ marginBottom: '16px' }} />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
-              {hasActiveFilters ? 'No audit data matching your search or filters.' : 'No audit data available.'}
+            <FileCheck size={44} color="#94A3B8" style={{ margin: '0 auto 1rem', display: 'block' }} />
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#334155', margin: '0 0 0.5rem' }}>
+              {hasActiveFilters ? 'No audit records match your filters' : 'No audit records available'}
             </h3>
-            <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '20px' }}>
-              {hasActiveFilters ? 'Try clearing your active filters or changing your search criteria.' : 'Consolidated audit records will appear here as audits are created and processed.'}
+            <p style={{ fontSize: '0.8375rem', color: '#64748B', margin: '0 0 1.25rem' }}>
+              {hasActiveFilters ? 'Try adjusting or clearing your filters to see matching audit sessions.' : 'Consolidated audit records will appear here as audits are processed.'}
             </p>
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
                 style={{
-                  padding: '8px 16px', backgroundColor: '#1565C0', color: '#FFFFFF',
-                  borderRadius: '6px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer'
+                  padding: '0.5rem 1.25rem', backgroundColor: '#1565C0', color: '#FFFFFF',
+                  borderRadius: '8px', fontSize: '0.8125rem', fontWeight: 700, border: 'none', cursor: 'pointer'
                 }}
               >
                 Reset Filters
@@ -471,65 +536,64 @@ export const CustomerOverallReport: React.FC = () => {
             )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {filteredAudits.map((group) => {
               const isExpanded = expandedGroups[group.auditPeriod] ?? true;
               const statusBadge = getStatusBadge(group.status);
               const avgScoreBadge = getScoreBadge(group.averageScore);
 
               return (
-                <div
-                  key={group.auditPeriod}
-                  style={{
-                    backgroundColor: '#FFFFFF', borderRadius: '12px',
-                    border: '1px solid #E2E8F0', overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                  }}
-                >
+                <div key={group.auditPeriod} className="overall-audit-card">
                   {/* AUDIT SECTION HEADER */}
                   <div
                     onClick={() => toggleGroup(group.auditPeriod)}
                     style={{
-                      padding: '20px 24px', backgroundColor: '#FFFFFF',
+                      padding: '1.125rem 1.5rem', backgroundColor: isExpanded ? '#FFFFFF' : '#FAFCFF',
                       display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
                       cursor: 'pointer', borderBottom: isExpanded ? '1px solid #E2E8F0' : 'none',
-                      transition: 'background-color 0.15s ease'
+                      transition: 'background-color 0.15s ease', gap: '0.75rem'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
                       <div style={{
-                        width: '32px', height: '32px', borderRadius: '6px',
+                        width: '32px', height: '32px', borderRadius: '50%',
                         backgroundColor: isExpanded ? '#1565C0' : '#F1F5F9',
                         color: isExpanded ? '#FFFFFF' : '#475569',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, transition: 'all 0.2s ease',
+                        boxShadow: isExpanded ? '0 2px 6px rgba(21, 101, 192, 0.25)' : 'none'
                       }}>
-                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
 
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+                          <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0B1F3A', margin: 0, letterSpacing: '-0.01em' }}>
                             {group.auditPeriod} Audit
                           </h2>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 8px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1565C0', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.15rem 0.55rem', borderRadius: '6px', fontFamily: 'monospace' }}>
                             {group.auditIdString}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px', fontSize: '13px', color: '#64748B' }}>
-                          <span>Type: <strong>{group.auditType}</strong></span>
-                          <span>•</span>
-                          <span>Vendors: <strong>{group.totalVendors}</strong></span>
-                          <span>•</span>
-                          <span>Completed: <strong>{group.completedVendors}/{group.totalVendors}</strong></span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.725rem', color: '#475569', background: '#F1F5F9', padding: '0.15rem 0.5rem', borderRadius: '5px', fontWeight: 600 }}>
+                            Type: {group.auditType || 'Standard'}
+                          </span>
+                          <span style={{ fontSize: '0.725rem', color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '0.15rem 0.5rem', borderRadius: '5px', fontWeight: 600 }}>
+                            Vendors: {group.totalVendors}
+                          </span>
+                          <span style={{ fontSize: '0.725rem', color: '#047857', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '0.15rem 0.5rem', borderRadius: '5px', fontWeight: 700 }}>
+                            Completed: {group.completedVendors}/{group.totalVendors}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Header Right Badges & Action */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
                       {/* Audit Status Badge */}
                       <span style={{
-                        padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                        padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.725rem', fontWeight: 700,
                         backgroundColor: statusBadge.bg, color: statusBadge.color, border: `1px solid ${statusBadge.border}`
                       }}>
                         {statusBadge.label}
@@ -537,11 +601,11 @@ export const CustomerOverallReport: React.FC = () => {
 
                       {/* Average Score Badge */}
                       <div style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.725rem', fontWeight: 800,
                         backgroundColor: avgScoreBadge.bg, color: avgScoreBadge.color, border: `1px solid ${avgScoreBadge.border}`
                       }}>
-                        <span>Avg Score:</span>
+                        <span style={{ opacity: 0.85, fontWeight: 600 }}>Avg Score:</span>
                         <span>{avgScoreBadge.label}</span>
                       </div>
 
@@ -550,13 +614,14 @@ export const CustomerOverallReport: React.FC = () => {
                         <button
                           onClick={() => navigate(`/customer/audits/${group.vendors[0].auditId}`)}
                           style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1',
-                            backgroundColor: '#FFFFFF', color: '#1E293B', fontSize: '12px', fontWeight: 600,
-                            cursor: 'pointer'
+                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                            padding: '0.35rem 0.75rem', borderRadius: '7px', border: '1px solid #CBD5E1',
+                            backgroundColor: '#FFFFFF', color: '#1565C0', fontSize: '0.75rem', fontWeight: 700,
+                            cursor: 'pointer', transition: 'all 0.15s ease', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                           }}
                         >
-                          <Eye size={14} color="#1565C0" /> View Audit
+                          <Eye size={13} color="#1565C0" />
+                          <span>View Audit</span>
                         </button>
                       )}
                     </div>
@@ -564,154 +629,164 @@ export const CustomerOverallReport: React.FC = () => {
 
                   {/* VENDOR SECTION (COLLAPSIBLE CONTENT) */}
                   {isExpanded && (
-                    <div>
+                    <div style={{ width: '100%', overflowX: 'hidden' }}>
                       {group.vendors.length === 0 ? (
-                        <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B', fontSize: '0.8125rem' }}>
                           No vendors associated with this audit.
                         </div>
                       ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead>
-                              <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vendor</th>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Compliance Score</th>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audit Status</th>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audit Progress</th>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Findings</th>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Historical Performance</th>
-                                <th style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {group.vendors.map((vendor, idx) => {
-                                const scoreBadge = getScoreBadge(vendor.complianceScore);
-                                const vStatusBadge = getStatusBadge(vendor.auditStatus);
+                        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8125rem' }}>
+                          <colgroup>
+                            <col style={{ width: '22%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '15%' }} />
+                            <col style={{ width: '15%' }} />
+                            <col style={{ width: '14%' }} />
+                            <col style={{ width: '8%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              <th style={{ padding: '0.75rem 0.6rem' }}>Vendor</th>
+                              <th style={{ padding: '0.75rem 0.6rem' }}>Compliance Score</th>
+                              <th style={{ padding: '0.75rem 0.6rem' }}>Audit Status</th>
+                              <th style={{ padding: '0.75rem 0.6rem' }}>Audit Progress</th>
+                              <th style={{ padding: '0.75rem 0.6rem' }}>Findings</th>
+                              <th style={{ padding: '0.75rem 0.6rem' }}>Historical Performance</th>
+                              <th style={{ padding: '0.75rem 0.6rem', textAlign: 'right' }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.vendors.map((vendor, idx) => {
+                              const scoreBadge = getScoreBadge(vendor.complianceScore);
+                              const vStatusBadge = getStatusBadge(vendor.auditStatus);
 
-                                return (
-                                  <tr key={vendor.vendorId || idx} style={{ borderBottom: idx < group.vendors.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                                    
-                                    {/* Vendor Name & ID */}
-                                    <td style={{ padding: '16px 20px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              return (
+                                <tr key={vendor.vendorId || idx} style={{ borderBottom: idx < group.vendors.length - 1 ? '1px solid #F1F5F9' : 'none', transition: 'background-color 0.15s ease' }}>
+                                  
+                                  {/* Vendor Name & ID */}
+                                  <td style={{ padding: '0.75rem 0.6rem', overflow: 'hidden' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                                      <div style={{
+                                        width: '30px', height: '30px', borderRadius: '8px',
+                                        backgroundColor: '#EFF6FF', color: '#1565C0',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontWeight: 800, fontSize: '0.75rem', flexShrink: 0
+                                      }}>
+                                        {(vendor.vendorName || 'V').substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={vendor.vendorName}>
+                                          {vendor.vendorName}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: '#64748B', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`ID: ${vendor.vendorId}`}>
+                                          #{vendor.vendorId ? vendor.vendorId.slice(0, 8) : 'N/A'}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Compliance Score */}
+                                  <td style={{ padding: '0.75rem 0.6rem', whiteSpace: 'nowrap' }}>
+                                    <span style={{
+                                      display: 'inline-block', padding: '0.2rem 0.55rem', borderRadius: '999px',
+                                      fontSize: '0.725rem', fontWeight: 800, backgroundColor: scoreBadge.bg,
+                                      color: scoreBadge.color, border: `1px solid ${scoreBadge.border}`
+                                    }}>
+                                      {scoreBadge.label}
+                                    </span>
+                                  </td>
+
+                                  {/* Audit Status */}
+                                  <td style={{ padding: '0.75rem 0.6rem', whiteSpace: 'nowrap' }}>
+                                    <span style={{
+                                      display: 'inline-block', padding: '0.2rem 0.55rem', borderRadius: '999px',
+                                      fontSize: '0.7rem', fontWeight: 700, backgroundColor: vStatusBadge.bg,
+                                      color: vStatusBadge.color, border: `1px solid ${vStatusBadge.border}`
+                                    }}>
+                                      {vStatusBadge.label}
+                                    </span>
+                                  </td>
+
+                                  {/* Audit Progress */}
+                                  <td style={{ padding: '0.75rem 0.6rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      <div style={{ flex: 1, backgroundColor: '#E2E8F0', height: '5px', borderRadius: '999px', overflow: 'hidden' }}>
                                         <div style={{
-                                          width: '34px', height: '34px', borderRadius: '8px',
-                                          backgroundColor: '#EFF6FF', color: '#1565C0',
-                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                          fontWeight: 700, fontSize: '14px'
-                                        }}>
-                                          {(vendor.vendorName || 'V').substring(0, 2).toUpperCase()}
-                                        </div>
-                                        <div>
-                                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                                            {vendor.vendorName}
-                                          </div>
-                                          <div style={{ fontSize: '12px', color: '#64748B' }}>
-                                            ID: {vendor.vendorId}
-                                          </div>
-                                        </div>
+                                          width: `${vendor.auditProgress}%`,
+                                          backgroundColor: vendor.auditProgress === 100 ? '#047857' : '#1565C0',
+                                          height: '100%', borderRadius: '999px'
+                                        }} />
                                       </div>
-                                    </td>
-
-                                    {/* Compliance Score (Single Source of Truth) */}
-                                    <td style={{ padding: '16px 20px' }}>
-                                      <span style={{
-                                        display: 'inline-block', padding: '6px 14px', borderRadius: '20px',
-                                        fontSize: '13px', fontWeight: 700, backgroundColor: scoreBadge.bg,
-                                        color: scoreBadge.color, border: `1px solid ${scoreBadge.border}`
-                                      }}>
-                                        {scoreBadge.label}
+                                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', minWidth: '26px' }}>
+                                        {vendor.auditProgress}%
                                       </span>
-                                    </td>
+                                    </div>
+                                  </td>
 
-                                    {/* Audit Status */}
-                                    <td style={{ padding: '16px 20px' }}>
+                                  {/* Findings Summary */}
+                                  <td style={{ padding: '0.75rem 0.6rem', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
                                       <span style={{
-                                        display: 'inline-block', padding: '4px 10px', borderRadius: '12px',
-                                        fontSize: '12px', fontWeight: 600, backgroundColor: vStatusBadge.bg,
-                                        color: vStatusBadge.color, border: `1px solid ${vStatusBadge.border}`
+                                        padding: '0.15rem 0.45rem', borderRadius: '5px', fontSize: '0.7rem', fontWeight: 700,
+                                        backgroundColor: vendor.criticalCount > 0 ? '#FEF2F2' : '#F1F5F9',
+                                        color: vendor.criticalCount > 0 ? '#DC2626' : '#475569',
+                                        border: `1px solid ${vendor.criticalCount > 0 ? '#FECACA' : '#E2E8F0'}`
                                       }}>
-                                        {vStatusBadge.label}
+                                        Findings: {vendor.findingsCount}
                                       </span>
-                                    </td>
-
-                                    {/* Audit Progress (Same source as Vendor Portal) */}
-                                    <td style={{ padding: '16px 20px', minWidth: '140px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <div style={{ flex: 1, backgroundColor: '#E2E8F0', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                                          <div style={{
-                                            width: `${vendor.auditProgress}%`,
-                                            backgroundColor: vendor.auditProgress === 100 ? '#047857' : '#1565C0',
-                                            height: '100%', borderRadius: '3px'
-                                          }} />
-                                        </div>
-                                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
-                                          {vendor.auditProgress}%
-                                        </span>
-                                      </div>
-                                    </td>
-
-                                    {/* Findings Summary */}
-                                    <td style={{ padding: '16px 20px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{
-                                          padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600,
-                                          backgroundColor: vendor.criticalCount > 0 ? '#FEF2F2' : '#F1F5F9',
-                                          color: vendor.criticalCount > 0 ? '#DC2626' : '#475569',
-                                          border: `1px solid ${vendor.criticalCount > 0 ? '#FECACA' : '#CBD5E1'}`
-                                        }}>
-                                          Findings: {vendor.findingsCount}
-                                        </span>
-                                        {vendor.criticalCount > 0 && (
-                                          <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600 }}>
-                                            ({vendor.criticalCount} Critical)
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-
-                                    {/* Historical Performance */}
-                                    <td style={{ padding: '16px 20px' }}>
-                                      {vendor.history && vendor.history.length > 0 ? (
-                                        <button
-                                          onClick={() => setSelectedHistoryVendor(vendor)}
-                                          style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                            padding: '4px 10px', borderRadius: '6px', border: '1px solid #E2E8F0',
-                                            backgroundColor: '#F8FAFC', color: '#1E293B', fontSize: '12px', fontWeight: 500,
-                                            cursor: 'pointer'
-                                          }}
-                                        >
-                                          <TrendingUp size={13} color="#1565C0" /> {vendor.history.length} Audits Logged
-                                        </button>
-                                      ) : (
-                                        <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic' }}>
-                                          Historical data not available
+                                      {vendor.criticalCount > 0 && (
+                                        <span style={{ fontSize: '0.675rem', color: '#DC2626', fontWeight: 700 }}>
+                                          ({vendor.criticalCount} crit)
                                         </span>
                                       )}
-                                    </td>
+                                    </div>
+                                  </td>
 
-                                    {/* Action Button */}
-                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                  {/* Historical Performance */}
+                                  <td style={{ padding: '0.75rem 0.6rem', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                                    {vendor.history && vendor.history.length > 0 ? (
                                       <button
-                                        onClick={() => navigate(`/customer/vendors/${vendor.vendorId !== 'N/A' ? vendor.vendorId : vendor.auditId}`)}
+                                        onClick={() => setSelectedHistoryVendor(vendor)}
                                         style={{
-                                          display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                          padding: '6px 12px', borderRadius: '6px', border: 'none',
-                                          backgroundColor: '#1565C0', color: '#FFFFFF', fontSize: '12px', fontWeight: 600,
-                                          cursor: 'pointer', transition: 'background-color 0.15s ease'
+                                          display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                          padding: '0.25rem 0.55rem', borderRadius: '6px', border: '1px solid #E2E8F0',
+                                          backgroundColor: '#F8FAFC', color: '#1E293B', fontSize: '0.725rem', fontWeight: 600,
+                                          cursor: 'pointer'
                                         }}
+                                        title="View Historical Audits"
                                       >
-                                        <Eye size={13} /> View
+                                        <TrendingUp size={12} color="#1565C0" />
+                                        <span>{vendor.history.length} Logged</span>
                                       </button>
-                                    </td>
+                                    ) : (
+                                      <span style={{ fontSize: '0.7rem', color: '#94A3B8', fontStyle: 'italic' }}>
+                                        None
+                                      </span>
+                                    )}
+                                  </td>
 
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                                  {/* Action Button */}
+                                  <td style={{ padding: '0.75rem 0.6rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    <button
+                                      onClick={() => navigate(`/customer/vendors/${vendor.vendorId !== 'N/A' ? vendor.vendorId : vendor.auditId}`)}
+                                      style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                        padding: '0.3rem 0.6rem', borderRadius: '7px', border: 'none',
+                                        backgroundColor: '#1565C0', color: '#FFFFFF', fontSize: '0.725rem', fontWeight: 700,
+                                        cursor: 'pointer', transition: 'background-color 0.15s ease'
+                                      }}
+                                    >
+                                      <Eye size={12} />
+                                      <span>View</span>
+                                    </button>
+                                  </td>
+
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       )}
                     </div>
                   )}

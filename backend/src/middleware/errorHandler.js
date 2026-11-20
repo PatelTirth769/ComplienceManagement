@@ -7,7 +7,7 @@ function errorHandler(err, req, res, next) {
   const isValidationError = err instanceof ValidationError || err.name === 'ValidationError';
 
   if (!isValidationError && process.env.NODE_ENV !== 'test') {
-    console.error('[Error Middleware]:', err);
+    console.error(`[Error Middleware] [${req.method} ${req.originalUrl}]:`, err.message || err);
   }
 
   if (isValidationError) {

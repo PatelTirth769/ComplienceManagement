@@ -17,6 +17,9 @@ import { AdminChecklist } from './pages/AdminChecklist';
 import { AdminAnalytics } from './pages/AdminAnalytics';
 import { AdminReports } from './pages/AdminReports';
 import { AdminReportDetails } from './pages/AdminReportDetails';
+import { AdminRules } from './pages/AdminRules';
+import { AdminInterview } from './pages/AdminInterview';
+import { InterviewLogin } from './pages/InterviewLogin';
 import { CustomerDashboard } from './pages/CustomerDashboard';
 import { CustomerVendors } from './pages/CustomerVendors';
 import { CustomerVendorDetails } from './pages/CustomerVendorDetails';
@@ -174,6 +177,42 @@ export function App() {
                 <AdminReportDetails />
               </ProtectedRoute>
             } 
+          />
+          <Route 
+            path="/admin/rules" 
+            element={
+              <ProtectedRoute allowedRoles={['Admin', 'admin']}>
+                <AdminRules />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/rules" 
+            element={<Navigate to="/admin/rules" replace />} 
+          />
+          <Route 
+            path="/admin/interview" 
+            element={
+              <ProtectedRoute allowedRoles={['Admin', 'admin']}>
+                <AdminInterview />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/inverview" 
+            element={<Navigate to="/admin/interview" replace />} 
+          />
+          <Route 
+            path="/interview" 
+            element={<Navigate to="/admin/interview" replace />} 
+          />
+          <Route 
+            path="/interview-login" 
+            element={<InterviewLogin />} 
+          />
+          <Route 
+            path="/interview-session" 
+            element={<InterviewLogin />} 
           />
           <Route 
             path="/customer" 

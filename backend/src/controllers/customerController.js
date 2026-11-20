@@ -1,6 +1,72 @@
+const path = require('path');
+const fs = require('fs');
 const { getDb } = require('../config/firebase');
 const excelReportService = require('../services/excelReportService');
 const pptReportService = require('../services/pptReportService');
+
+const actRulesFilePath = path.join(__dirname, '../data/actRules.json');
+
+/**
+ * Helper to resolve customer identity and access verification
+ */
+async function getCustomerIdentity(req, db) {
+  const customerId = req.user ? req.user.id : null;
+  const userEmail = (req.user && req.user.email ? req.user.email : '').toLowerCase().trim();
+  const customerNames = [];
+
+  if (req.user && req.user.name) {
+    customerNames.push(req.user.name.toLowerCase().trim());
+  }
+
+  if (customerId && db) {
+    try {
+      const custDoc = await db.collection('users').doc(customerId).get();
+      if (custDoc.exists) {
+        const d = custDoc.data();
+        [d.name, d.fullName, d.companyName, d.organisation, d.contactPerson].forEach(val => {
+          if (val && typeof val === 'string' && val.trim()) {
+            const cleanVal = val.toLowerCase().trim();
+            if (!customerNames.includes(cleanVal)) {
+              customerNames.push(cleanVal);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Customer identity lookup warn:', e.message);
+    }
+  }
+
+  const primaryName = customerNames[0] || req.user?.name || 'Customer';
+
+  const isAuditForCustomer = (auditData) => {
+    if (!auditData) return false;
+    // Direct Customer ID match
+    if (customerId && (auditData.customerId === customerId || auditData.customer === customerId)) {
+      return true;
+    }
+    // Direct Customer Email match
+    if (userEmail && auditData.customerEmail && auditData.customerEmail.toLowerCase().trim() === userEmail) {
+      return true;
+    }
+    // Customer Name / Organisation match
+    if (auditData.customerName && customerNames.includes(auditData.customerName.toLowerCase().trim())) {
+      return true;
+    }
+    if (auditData.organisation && customerNames.includes(auditData.organisation.toLowerCase().trim())) {
+      return true;
+    }
+    return false;
+  };
+
+  return {
+    customerId,
+    userEmail,
+    customerNames,
+    primaryName,
+    isAuditForCustomer
+  };
+}
 
 /**
  * Get Customer Dashboard Statistics & Data
@@ -8,44 +74,15 @@ const pptReportService = require('../services/pptReportService');
 exports.getDashboardStats = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
-    const userEmail = (req.user.email || '').toLowerCase();
+    const { customerId, userEmail, customerNames, isAuditForCustomer } = await getCustomerIdentity(req, db);
 
-    // 1. Fetch customer user document for name/organisation lookup
-    let customerName = req.user.name || 'Customer';
-    try {
-      const custDoc = await db.collection('users').doc(customerId).get();
-      if (custDoc.exists) {
-        const d = custDoc.data();
-        customerName = d.name || d.organisation || d.companyName || d.fullName || customerName;
-      }
-    } catch (e) {
-      console.warn('Customer doc lookup warn:', e.message);
-    }
-
-    // 2. Fetch all vendors for this customer
-    const usersRef = db.collection('users');
-    const vendorsSnapshot = await usersRef.where('role', '==', 'vendor').get();
-    const vendorMap = new Map();
-
-    vendorsSnapshot.forEach(doc => {
-      const v = doc.data();
-      const isMyVendor = (
-        v.customerId === customerId ||
-        (v.customerName && v.customerName.toLowerCase() === customerName.toLowerCase()) ||
-        (v.customerEmail && v.customerEmail.toLowerCase() === userEmail)
-      );
-      if (isMyVendor) {
-        vendorMap.set(doc.id, { id: doc.id, ...v });
-      }
-    });
-
-    // 3. Fetch audits belonging to this customer
+    // 1. Fetch audits belonging to this customer
     const auditsRef = db.collection('audits');
     const auditsSnapshot = await auditsRef.get();
 
     const customerAudits = [];
     const recentMilestones = [];
+    const vendorMap = new Map();
     let activeAuditsCount = 0;
     let completedAuditsCount = 0;
     let pendingActionsCount = 0;
@@ -54,77 +91,85 @@ exports.getDashboardStats = async (req, res) => {
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
-      const matchCust = (
-        data.customerId === customerId ||
-        data.customer === customerId ||
-        (data.customerEmail && data.customerEmail.toLowerCase() === userEmail) ||
-        (data.customerName && data.customerName.toLowerCase().includes(customerName.toLowerCase())) ||
-        (data.vendorId && vendorMap.has(data.vendorId))
-      );
+      if (!isAuditForCustomer(data)) return;
 
-      // If explicit match or system demo audits exist
-      if (matchCust || auditsSnapshot.size > 0) {
-        const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
-        const status = (data.status || 'Scheduled').toLowerCase();
+      const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
+      const status = (data.status || 'Scheduled').toLowerCase();
 
-        const isCompleted = ['completed', 'closed', 'approved'].includes(status);
-        const isActive = ['scheduled', 'in progress', 'pending sign-off', 'released', 'under review'].includes(status);
+      const isCompleted = ['completed', 'closed', 'approved'].includes(status);
+      const isActive = ['scheduled', 'in progress', 'pending sign-off', 'released', 'under review'].includes(status);
 
-        if (isActive) activeAuditsCount++;
-        if (isCompleted) {
-          completedAuditsCount++;
-          if (data.score !== undefined && data.score !== null) {
-            totalScoresSum += Number(data.score);
-            completedWithScoreCount++;
-          }
-        }
-        if (status === 'pending sign-off' || status === 'under review') {
-          pendingActionsCount++;
-        }
-
-        const vId = data.vendorId || data.vendor || doc.id;
-        if (!vendorMap.has(vId) && data.vendorName) {
-          vendorMap.set(vId, {
-            id: vId,
-            companyName: data.vendorName || data.organisation || 'Vendor',
-            contactPerson: data.vendorRepresentative || 'N/A',
-            email: data.vendorEmail || 'N/A'
-          });
-        }
-
-        const auditItem = {
-          id: doc.id,
-          auditIdString: data.auditIdString || data.id || doc.id,
-          vendorName: data.vendorName || data.organisation || 'Vendor',
-          vendorId: data.vendorId || 'N/A',
-          auditPeriod: data.auditPeriod || 'Q3 2026',
-          status: data.status || 'Scheduled',
-          completionPercentage,
-          score: data.score !== undefined ? data.score : null,
-          criticalFindingsCount: (data.nonCompliantItems || []).filter(i => i && i.isCritical).length,
-          auditorName: data.auditorName || data.auditor || 'Auditor',
-          startDate: data.startDate || data.createdAt,
-          dueDate: data.dueDate || new Date().toISOString()
-        };
-
-        customerAudits.push(auditItem);
-
-        // Collect Milestones
-        if (Array.isArray(data.timeline)) {
-          data.timeline.forEach(t => {
-            recentMilestones.push({
-              vendorName: auditItem.vendorName,
-              auditIdString: auditItem.auditIdString,
-              event: t.event || 'Audit Activity',
-              status: t.status || auditItem.status,
-              timestamp: t.timestamp || new Date().toISOString(),
-              actor: t.actor || 'System',
-              notes: t.notes || ''
-            });
-          });
+      if (isActive) activeAuditsCount++;
+      if (isCompleted) {
+        completedAuditsCount++;
+        if (data.score !== undefined && data.score !== null) {
+          totalScoresSum += Number(data.score);
+          completedWithScoreCount++;
         }
       }
+      if (status === 'pending sign-off' || status === 'under review') {
+        pendingActionsCount++;
+      }
+
+      const vId = data.vendorId || data.vendor || doc.id;
+      if (!vendorMap.has(vId) && (data.vendorName || data.organisation)) {
+        vendorMap.set(vId, {
+          id: vId,
+          companyName: data.vendorName || data.organisation || 'Vendor',
+          contactPerson: data.vendorRepresentative || 'N/A',
+          email: data.vendorEmail || 'N/A'
+        });
+      }
+
+      const auditItem = {
+        id: doc.id,
+        auditIdString: data.auditIdString || data.id || doc.id,
+        vendorName: data.vendorName || data.organisation || 'Vendor',
+        vendorId: data.vendorId || 'N/A',
+        auditPeriod: data.auditPeriod || 'Q3 2026',
+        status: data.status || 'Scheduled',
+        completionPercentage,
+        score: data.score !== undefined ? data.score : null,
+        criticalFindingsCount: (data.nonCompliantItems || []).filter(i => i && i.isCritical).length,
+        auditorName: data.auditorName || data.auditor || 'Auditor',
+        startDate: data.startDate || data.createdAt,
+        dueDate: data.dueDate || new Date().toISOString()
+      };
+
+      customerAudits.push(auditItem);
+
+      // Collect Milestones
+      if (Array.isArray(data.timeline)) {
+        data.timeline.forEach(t => {
+          recentMilestones.push({
+            vendorName: auditItem.vendorName,
+            auditIdString: auditItem.auditIdString,
+            event: t.event || 'Audit Activity',
+            status: t.status || auditItem.status,
+            timestamp: t.timestamp || new Date().toISOString(),
+            actor: t.actor || 'System',
+            notes: t.notes || ''
+          });
+        });
+      }
     });
+
+    // Also include any explicitly assigned vendors from users collection
+    try {
+      const usersRef = db.collection('users');
+      const vendorsSnapshot = await usersRef.where('role', '==', 'vendor').get();
+      vendorsSnapshot.forEach(doc => {
+        const v = doc.data();
+        const isAssigned = (
+          (v.customerId && v.customerId === customerId) ||
+          (v.customerEmail && v.customerEmail.toLowerCase().trim() === userEmail) ||
+          (v.customerName && customerNames.includes(v.customerName.toLowerCase().trim()))
+        );
+        if (isAssigned && !vendorMap.has(doc.id)) {
+          vendorMap.set(doc.id, { id: doc.id, ...v });
+        }
+      });
+    } catch (e) {}
 
     const overallCompliance = completedWithScoreCount > 0
       ? Math.round(totalScoresSum / completedWithScoreCount)
@@ -157,44 +202,18 @@ exports.getDashboardStats = async (req, res) => {
 exports.getVendors = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
-    const userEmail = (req.user.email || '').toLowerCase();
+    const { customerId, userEmail, customerNames, isAuditForCustomer } = await getCustomerIdentity(req, db);
 
-    let customerName = req.user.name || 'Customer';
-    try {
-      const custDoc = await db.collection('users').doc(customerId).get();
-      if (custDoc.exists) {
-        const d = custDoc.data();
-        customerName = d.name || d.organisation || d.companyName || d.fullName || customerName;
-      }
-    } catch (e) {
-      console.warn('Customer doc lookup warn:', e.message);
-    }
-
-    const usersRef = db.collection('users');
-    const snapshot = await usersRef.where('role', '==', 'vendor').get();
-
-    const rawVendors = [];
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      delete data.password;
-      const isMyVendor = (
-        data.customerId === customerId ||
-        (data.customerName && data.customerName.toLowerCase() === customerName.toLowerCase()) ||
-        (data.customerEmail && data.customerEmail.toLowerCase() === userEmail) ||
-        !data.customerId
-      );
-      if (isMyVendor) {
-        rawVendors.push({ id: doc.id, ...data });
-      }
-    });
-
-    // Fetch all audits to map audits to vendors
+    // Fetch all audits to map audits to vendors, ONLY FOR THIS CUSTOMER
     const auditsSnapshot = await db.collection('audits').get();
     const auditsByVendor = new Map();
+    const myVendorIds = new Set();
+    const myVendorNames = new Set();
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
+
       const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
       const auditObj = {
         id: doc.id,
@@ -203,11 +222,16 @@ exports.getVendors = async (req, res) => {
         completionPercentage
       };
 
+      if (data.vendorId) myVendorIds.add(data.vendorId);
+      if (data.vendor) myVendorIds.add(data.vendor);
+      if (data.vendorName) myVendorNames.add(data.vendorName.toLowerCase().trim());
+      if (data.organisation) myVendorNames.add(data.organisation.toLowerCase().trim());
+
       const keys = [
         data.vendorId,
         data.vendor,
-        (data.vendorName || '').toLowerCase(),
-        (data.organisation || '').toLowerCase()
+        (data.vendorName || '').toLowerCase().trim(),
+        (data.organisation || '').toLowerCase().trim()
       ].filter(Boolean);
 
       keys.forEach(k => {
@@ -218,8 +242,46 @@ exports.getVendors = async (req, res) => {
       });
     });
 
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('role', '==', 'vendor').get();
+
+    const rawVendors = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      delete data.password;
+      const vCompName = (data.companyName || data.name || '').toLowerCase().trim();
+      const isMyVendor = (
+        (data.customerId && data.customerId === customerId) ||
+        (data.customerName && customerNames.includes(data.customerName.toLowerCase().trim())) ||
+        (data.customerEmail && data.customerEmail.toLowerCase().trim() === userEmail) ||
+        myVendorIds.has(doc.id) ||
+        (vCompName && myVendorNames.has(vCompName))
+      );
+      if (isMyVendor) {
+        rawVendors.push({ id: doc.id, ...data });
+      }
+    });
+
+    // Also include any vendors that exist in the customer's audits but not in users collection
+    auditsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
+      const vId = data.vendorId || data.vendor || doc.id;
+      const vName = data.vendorName || 'Vendor';
+      if (!rawVendors.some(v => v.id === vId || (v.companyName && v.companyName.toLowerCase() === vName.toLowerCase()))) {
+        rawVendors.push({
+          id: vId,
+          companyName: vName,
+          name: vName,
+          contactPerson: data.vendorRepresentative || 'N/A',
+          email: data.vendorEmail || 'N/A',
+          phone: 'N/A'
+        });
+      }
+    });
+
     const vendors = rawVendors.map(v => {
-      const vCompName = (v.companyName || v.name || '').toLowerCase();
+      const vCompName = (v.companyName || v.name || '').toLowerCase().trim();
       const vAudits = (auditsByVendor.get(v.id) || [])
         .concat(vCompName ? (auditsByVendor.get(vCompName) || []) : []);
       
@@ -263,7 +325,7 @@ exports.getVendors = async (req, res) => {
 exports.getVendorById = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
+    const { customerId, userEmail, customerNames, isAuditForCustomer } = await getCustomerIdentity(req, db);
     const { vendorId } = req.params;
 
     let userDoc = await db.collection('users').doc(vendorId).get();
@@ -279,26 +341,22 @@ exports.getVendorById = async (req, res) => {
       });
     }
 
-    if (!vendorData) {
-      return res.status(404).json({ success: false, error: 'Vendor record not found' });
-    }
-
-    delete vendorData.password;
-    const vCompName = (vendorData.companyName || vendorData.name || '').toLowerCase();
-
-    // Fetch all audits matching vendor ID or vendor name
+    // Fetch all audits matching vendor ID or vendor name, ONLY FOR THIS CUSTOMER
     const auditsSnapshot = await db.collection('audits').get();
     const vendorAudits = [];
+    const vCompName = vendorData ? (vendorData.companyName || vendorData.name || '').toLowerCase().trim() : vendorId.toLowerCase().trim();
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
+
       const matchVendor = (
-        data.vendorId === userDoc.id ||
+        (userDoc && data.vendorId === userDoc.id) ||
         data.vendorId === vendorId ||
         doc.id === vendorId ||
         data.vendor === vendorId ||
-        (data.vendorName && data.vendorName.toLowerCase() === vCompName) ||
-        (data.organisation && data.organisation.toLowerCase() === vCompName)
+        (data.vendorName && data.vendorName.toLowerCase().trim() === vCompName) ||
+        (data.organisation && data.organisation.toLowerCase().trim() === vCompName)
       );
       if (matchVendor) {
         const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
@@ -311,6 +369,31 @@ exports.getVendorById = async (req, res) => {
       }
     });
 
+    if (!vendorData && vendorAudits.length > 0) {
+      vendorData = {
+        companyName: vendorAudits[0].vendorName || 'Vendor',
+        contactPerson: vendorAudits[0].vendorRepresentative || 'N/A',
+        email: vendorAudits[0].vendorEmail || 'N/A',
+        phone: 'N/A'
+      };
+    }
+
+    if (!vendorData) {
+      return res.status(404).json({ success: false, error: 'Vendor record not found' });
+    }
+
+    // Access check: vendor must belong to customer or customer must have audits with this vendor
+    const isDirectVendor = (
+      (vendorData.customerId && vendorData.customerId === customerId) ||
+      (vendorData.customerName && customerNames.includes(vendorData.customerName.toLowerCase().trim())) ||
+      (vendorData.customerEmail && vendorData.customerEmail.toLowerCase().trim() === userEmail)
+    );
+
+    if (!isDirectVendor && vendorAudits.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor record not found for your account' });
+    }
+
+    delete vendorData.password;
     vendorAudits.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
     const activeAudit = vendorAudits.find(a => ['scheduled', 'in progress', 'pending sign-off', 'under review'].includes((a.status || '').toLowerCase()));
@@ -339,7 +422,7 @@ exports.getVendorById = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        vendor: { id: userDoc.id, ...vendorData },
+        vendor: { id: userDoc ? userDoc.id : vendorId, ...vendorData },
         currentAudit,
         findingsSummary: {
           totalFindings,
@@ -363,17 +446,22 @@ exports.getVendorById = async (req, res) => {
 exports.getAudits = async (req, res) => {
   try {
     const db = getDb();
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
     const auditsRef = db.collection('audits');
     const snapshot = await auditsRef.orderBy('createdAt', 'desc').get();
     const customerAudits = [];
 
     snapshot.forEach(doc => {
       const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
+
       const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
       customerAudits.push({
         id: doc.id,
         auditIdString: data.auditIdString || data.id || doc.id,
         ...data,
+        auditType: data.auditType || 'Original',
+        isReadOnly: data.isReadOnly === true,
         completionPercentage
       });
     });
@@ -391,6 +479,7 @@ exports.getAudits = async (req, res) => {
 exports.getAuditById = async (req, res) => {
   try {
     const db = getDb();
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
     const { id } = req.params;
     const doc = await db.collection('audits').doc(id).get();
 
@@ -399,7 +488,24 @@ exports.getAuditById = async (req, res) => {
     }
 
     const data = doc.data();
+    if (!isAuditForCustomer(data)) {
+      return res.status(404).json({ success: false, error: 'Audit record not found' });
+    }
+
     const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
+
+    let actRulesSnapshot = data.actRules;
+    if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
+      if (fs.existsSync(actRulesFilePath)) {
+        try {
+          actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+        } catch (e) {
+          actRulesSnapshot = [];
+        }
+      } else {
+        actRulesSnapshot = [];
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -407,8 +513,10 @@ exports.getAuditById = async (req, res) => {
         id: doc.id,
         auditIdString: data.auditIdString || data.id || doc.id,
         ...data,
-        completionPercentage,
-        isReadOnly: true
+        actRules: actRulesSnapshot || [],
+        auditType: data.auditType || 'Original',
+        isReadOnly: data.isReadOnly === true,
+        completionPercentage
       }
     });
   } catch (error) {
@@ -423,34 +531,7 @@ exports.getAuditById = async (req, res) => {
 exports.getTimeline = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
-    const userEmail = (req.user.email || '').toLowerCase();
-
-    let customerName = req.user.name || 'Customer';
-    try {
-      const custDoc = await db.collection('users').doc(customerId).get();
-      if (custDoc.exists) {
-        const d = custDoc.data();
-        customerName = d.name || d.organisation || d.companyName || d.fullName || customerName;
-      }
-    } catch (e) {}
-
-    const usersRef = db.collection('users');
-    const vendorsSnapshot = await usersRef.where('role', '==', 'vendor').get();
-    const vendorMap = new Map();
-
-    vendorsSnapshot.forEach(doc => {
-      const v = doc.data();
-      const isMyVendor = (
-        v.customerId === customerId ||
-        (v.customerName && v.customerName.toLowerCase() === customerName.toLowerCase()) ||
-        (v.customerEmail && v.customerEmail.toLowerCase() === userEmail) ||
-        !v.customerId
-      );
-      if (isMyVendor) {
-        vendorMap.set(doc.id, { id: doc.id, ...v });
-      }
-    });
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
 
     const auditsSnapshot = await db.collection('audits').get();
     const audits = [];
@@ -458,50 +539,41 @@ exports.getTimeline = async (req, res) => {
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
-      const matchCust = (
-        data.customerId === customerId ||
-        data.customer === customerId ||
-        (data.customerEmail && data.customerEmail.toLowerCase() === userEmail) ||
-        (data.customerName && data.customerName.toLowerCase().includes(customerName.toLowerCase())) ||
-        (data.vendorId && vendorMap.has(data.vendorId)) ||
-        true
-      );
+      if (!isAuditForCustomer(data)) return;
 
-      if (matchCust) {
-        const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
-        const auditObj = {
-          id: doc.id,
-          auditIdString: data.auditIdString || data.id || doc.id,
-          vendorName: data.vendorName || data.organisation || 'Vendor',
-          vendorId: data.vendorId || 'N/A',
-          auditPeriod: data.auditPeriod || 'Q3 2026',
-          establishmentType: data.establishmentType || 'Standard Audit',
-          status: data.status || 'Scheduled',
-          completionPercentage,
-          score: data.score !== undefined && data.score !== null ? Number(data.score) : null,
-          auditorName: data.auditorName || data.auditor || 'Auditor',
-          startDate: data.startDate || data.createdAt,
-          dueDate: data.dueDate || new Date().toISOString(),
-          createdAt: data.createdAt || new Date().toISOString(),
-          timeline: Array.isArray(data.timeline) ? data.timeline : []
-        };
+      const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
+      const auditObj = {
+        id: doc.id,
+        auditIdString: data.auditIdString || data.id || doc.id,
+        vendorName: data.vendorName || data.organisation || 'Vendor',
+        vendorId: data.vendorId || 'N/A',
+        auditPeriod: data.auditPeriod || 'Q3 2026',
+        establishmentType: data.establishmentType || 'Standard Audit',
+        status: data.status || 'Scheduled',
+        completionPercentage,
+        score: data.score !== undefined && data.score !== null ? Number(data.score) : null,
+        auditorName: data.auditorName || data.auditor || 'Auditor',
+        startDate: data.startDate || data.createdAt,
+        dueDate: data.dueDate || new Date().toISOString(),
+        createdAt: data.createdAt || new Date().toISOString(),
+        timeline: Array.isArray(data.timeline) ? data.timeline : []
+      };
 
-        audits.push(auditObj);
+      audits.push(auditObj);
 
-        if (Array.isArray(data.timeline)) {
-          data.timeline.forEach(t => {
-            allEvents.push({
-              auditId: doc.id,
-              auditIdString: auditObj.auditIdString,
-              vendorName: auditObj.vendorName,
-              event: t.event || 'Audit Activity',
-              status: t.status || auditObj.status,
-              timestamp: t.timestamp || new Date().toISOString(),
-              actor: t.actor || 'System',
-              notes: t.notes || ''
-            });
+      if (Array.isArray(data.timeline)) {
+        data.timeline.forEach(t => {
+          allEvents.push({
+            auditId: doc.id,
+            auditIdString: auditObj.auditIdString,
+            vendorName: auditObj.vendorName,
+            event: t.event || 'Audit Activity',
+            status: t.status || auditObj.status,
+            timestamp: t.timestamp || new Date().toISOString(),
+            actor: t.actor || 'System',
+            notes: t.notes || ''
           });
-        }
+        });
       }
     });
 
@@ -527,34 +599,7 @@ exports.getTimeline = async (req, res) => {
 exports.getComplianceScores = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
-    const userEmail = (req.user.email || '').toLowerCase();
-
-    let customerName = req.user.name || 'Customer';
-    try {
-      const custDoc = await db.collection('users').doc(customerId).get();
-      if (custDoc.exists) {
-        const d = custDoc.data();
-        customerName = d.name || d.organisation || d.companyName || d.fullName || customerName;
-      }
-    } catch (e) {}
-
-    const usersRef = db.collection('users');
-    const vendorsSnapshot = await usersRef.where('role', '==', 'vendor').get();
-    const vendorMap = new Map();
-
-    vendorsSnapshot.forEach(doc => {
-      const v = doc.data();
-      const isMyVendor = (
-        v.customerId === customerId ||
-        (v.customerName && v.customerName.toLowerCase() === customerName.toLowerCase()) ||
-        (v.customerEmail && v.customerEmail.toLowerCase() === userEmail) ||
-        !v.customerId
-      );
-      if (isMyVendor) {
-        vendorMap.set(doc.id, { id: doc.id, ...v });
-      }
-    });
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
 
     const auditsSnapshot = await db.collection('audits').get();
     const audits = [];
@@ -573,6 +618,8 @@ exports.getComplianceScores = async (req, res) => {
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
+
       const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
       const status = (data.status || 'Scheduled').toLowerCase();
       const isCompleted = ['closed', 'completed', 'approved'].includes(status);
@@ -700,37 +747,19 @@ exports.getComplianceScores = async (req, res) => {
 exports.getReports = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
-    const userEmail = (req.user.email || '').toLowerCase();
-
-    let customerName = req.user.name || 'Customer';
-    try {
-      const custDoc = await db.collection('users').doc(customerId).get();
-      if (custDoc.exists) {
-        const d = custDoc.data();
-        customerName = d.name || d.organisation || d.companyName || d.fullName || customerName;
-      }
-    } catch (e) {}
-
-    const usersRef = db.collection('users');
-    const vendorsSnapshot = await usersRef.where('role', '==', 'vendor').get();
-    const vendorMap = new Map();
-
-    vendorsSnapshot.forEach(doc => {
-      const v = doc.data();
-      const isMyVendor = (
-        v.customerId === customerId ||
-        (v.customerName && v.customerName.toLowerCase() === customerName.toLowerCase()) ||
-        (v.customerEmail && v.customerEmail.toLowerCase() === userEmail) ||
-        !v.customerId
-      );
-      if (isMyVendor) {
-        vendorMap.set(doc.id, { id: doc.id, ...v });
-      }
-    });
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
 
     const auditsSnapshot = await db.collection('audits').get();
     const reports = [];
+
+    let defaultActRules = [];
+    if (fs.existsSync(actRulesFilePath)) {
+      try {
+        defaultActRules = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+      } catch (e) {
+        defaultActRules = [];
+      }
+    }
 
     let totalReports = 0;
     let completedAudits = 0;
@@ -739,17 +768,9 @@ exports.getReports = async (req, res) => {
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
-      const matchCust = (
-        data.customerId === customerId ||
-        data.customer === customerId ||
-        (data.customerEmail && data.customerEmail.toLowerCase() === userEmail) ||
-        (data.customerName && data.customerName.toLowerCase().includes(customerName.toLowerCase())) ||
-        (data.vendorId && vendorMap.has(data.vendorId)) ||
-        true
-      );
+      if (!isAuditForCustomer(data)) return;
 
-      if (matchCust) {
-        totalReports++;
+      totalReports++;
         const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
         const status = (data.status || 'Scheduled').toLowerCase();
         const isClosedOrCompleted = ['closed', 'completed', 'approved'].includes(status) || completionPercentage === 100;
@@ -773,6 +794,11 @@ exports.getReports = async (req, res) => {
           });
         }
 
+        let actRulesSnapshot = data.actRules;
+        if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
+          actRulesSnapshot = defaultActRules;
+        }
+
         reports.push({
           id: doc.id,
           auditIdString: data.auditIdString || data.id || doc.id,
@@ -788,6 +814,7 @@ exports.getReports = async (req, res) => {
           summary: data.summary || {},
           nonCompliantItems: Array.isArray(data.nonCompliantItems) ? data.nonCompliantItems : [],
           auditorName: data.auditorName || data.auditor || 'Auditor',
+          actRules: actRulesSnapshot,
           reportAvailable: isClosedOrCompleted,
           reportStatus: isClosedOrCompleted ? 'Available' : 'Pending',
           generatedDate: isClosedOrCompleted ? (data.updatedAt || data.createdAt || new Date().toISOString()) : null,
@@ -795,7 +822,6 @@ exports.getReports = async (req, res) => {
           criticalCount,
           generalCount
         });
-      }
     });
 
     reports.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -822,8 +848,7 @@ exports.getReports = async (req, res) => {
 exports.getNotifications = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user.id;
-    const userEmail = (req.user.email || '').toLowerCase();
+    const { customerId, isAuditForCustomer } = await getCustomerIdentity(req, db);
 
     let readNotificationIds = [];
     try {
@@ -840,6 +865,7 @@ exports.getNotifications = async (req, res) => {
 
     auditsSnapshot.forEach(doc => {
       const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
 
       // Timeline notifications
       if (Array.isArray(data.timeline)) {
@@ -987,6 +1013,11 @@ exports.downloadAuditExcel = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Audit not found' });
     }
     const audit = { id: docSnap.id, ...docSnap.data() };
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
+    if (!isAuditForCustomer(audit)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: You do not have permission to download this audit report.' });
+    }
+
     const completionPct = excelReportService.getAuditCompletionPercentage(audit);
     if (completionPct < 100) {
       return res.status(400).json({
@@ -1046,6 +1077,10 @@ exports.downloadAuditPpt = async (req, res) => {
     }
 
     const auditData = { id: docSnap.id, ...docSnap.data() };
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
+    if (!isAuditForCustomer(auditData)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: You do not have permission to download this audit report.' });
+    }
     const completionPct = excelReportService.getAuditCompletionPercentage(auditData);
     const statusLower = (auditData.status || '').toLowerCase();
 
@@ -1083,23 +1118,47 @@ exports.downloadAuditPpt = async (req, res) => {
 exports.getOverallReport = async (req, res) => {
   try {
     const db = getDb();
-    const customerId = req.user ? req.user.id : null;
-    const userEmail = (req.user && req.user.email ? req.user.email : '').toLowerCase();
+    const { customerId, userEmail, customerNames, isAuditForCustomer } = await getCustomerIdentity(req, db);
 
-    let customerName = (req.user && req.user.name) || 'Customer';
-    try {
-      if (customerId) {
-        const custDoc = await db.collection('users').doc(customerId).get();
-        if (custDoc.exists) {
-          const d = custDoc.data();
-          customerName = d.name || d.organisation || d.companyName || d.fullName || customerName;
-        }
+    // 1. Fetch audits belonging strictly to this customer
+    const auditsSnapshot = await db.collection('audits').get();
+    const rawAudits = [];
+    const customerVendorIds = new Set();
+
+    auditsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (!isAuditForCustomer(data)) return;
+
+      if (data.vendorId) {
+        customerVendorIds.add(data.vendorId);
       }
-    } catch (e) {
-      console.warn('Customer doc lookup warn:', e.message);
-    }
 
-    // 1. Fetch authorized vendors
+      const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
+      const nonCompliantItems = Array.isArray(data.nonCompliantItems) ? data.nonCompliantItems : [];
+      const criticalCount = nonCompliantItems.filter(i => i && i.isCritical).length;
+      const generalCount = nonCompliantItems.length - criticalCount;
+
+      rawAudits.push({
+        id: doc.id,
+        auditIdString: data.auditIdString || data.id || doc.id,
+        vendorName: data.vendorName || data.organisation || 'Vendor',
+        vendorId: data.vendorId || 'N/A',
+        vendorEmail: data.vendorEmail || '',
+        auditPeriod: data.auditPeriod || 'Q3 2026',
+        auditType: data.establishmentType || data.auditType || 'Standard Audit',
+        status: data.status || 'Scheduled',
+        completionPercentage,
+        score: data.score !== undefined && data.score !== null ? Number(data.score) : null,
+        nonCompliantItems,
+        criticalCount,
+        generalCount,
+        findingsCount: nonCompliantItems.length,
+        auditorName: data.auditorName || data.auditor || 'Auditor',
+        createdAt: data.createdAt || data.startDate || new Date().toISOString()
+      });
+    });
+
+    // 2. Fetch authorized vendors linked to this customer or this customer's audits
     const usersRef = db.collection('users');
     const vendorsSnapshot = await usersRef.where('role', '==', 'vendor').get();
     const vendorMap = new Map();
@@ -1107,55 +1166,13 @@ exports.getOverallReport = async (req, res) => {
     vendorsSnapshot.forEach(doc => {
       const v = doc.data();
       const isMyVendor = (
-        v.customerId === customerId ||
-        (v.customerName && v.customerName.toLowerCase() === customerName.toLowerCase()) ||
-        (v.customerEmail && v.customerEmail.toLowerCase() === userEmail) ||
-        !v.customerId
+        customerVendorIds.has(doc.id) ||
+        (customerId && v.customerId === customerId) ||
+        (v.customerEmail && userEmail && v.customerEmail.toLowerCase().trim() === userEmail) ||
+        (v.customerName && customerNames.includes(v.customerName.toLowerCase().trim()))
       );
       if (isMyVendor) {
         vendorMap.set(doc.id, { id: doc.id, ...v });
-      }
-    });
-
-    // 2. Fetch all audits
-    const auditsSnapshot = await db.collection('audits').get();
-    const rawAudits = [];
-
-    auditsSnapshot.forEach(doc => {
-      const data = doc.data();
-      const matchCust = (
-        data.customerId === customerId ||
-        data.customer === customerId ||
-        (data.customerEmail && data.customerEmail.toLowerCase() === userEmail) ||
-        (data.customerName && data.customerName.toLowerCase().includes(customerName.toLowerCase())) ||
-        (data.vendorId && vendorMap.has(data.vendorId)) ||
-        true
-      );
-
-      if (matchCust) {
-        const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
-        const nonCompliantItems = Array.isArray(data.nonCompliantItems) ? data.nonCompliantItems : [];
-        const criticalCount = nonCompliantItems.filter(i => i && i.isCritical).length;
-        const generalCount = nonCompliantItems.length - criticalCount;
-
-        rawAudits.push({
-          id: doc.id,
-          auditIdString: data.auditIdString || data.id || doc.id,
-          vendorName: data.vendorName || data.organisation || 'Vendor',
-          vendorId: data.vendorId || 'N/A',
-          vendorEmail: data.vendorEmail || '',
-          auditPeriod: data.auditPeriod || 'Q3 2026',
-          auditType: data.establishmentType || data.auditType || 'Standard Audit',
-          status: data.status || 'Scheduled',
-          completionPercentage,
-          score: data.score !== undefined && data.score !== null ? Number(data.score) : null,
-          nonCompliantItems,
-          criticalCount,
-          generalCount,
-          findingsCount: nonCompliantItems.length,
-          auditorName: data.auditorName || data.auditor || 'Auditor',
-          createdAt: data.createdAt || data.startDate || new Date().toISOString()
-        });
       }
     });
 
@@ -1293,3 +1310,137 @@ exports.getOverallReport = async (req, res) => {
     res.status(500).json({ success: false, error: 'Internal server error generating overall report' });
   }
 };
+
+/**
+ * Configure whether Auditor can see vendor uploaded documents for an audit
+ */
+exports.updateAuditorDocumentAccess = async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+    const { allowAuditorToSeeDocuments } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Audit ID is required' });
+    }
+
+    const auditRef = db.collection('audits').doc(id);
+    let docSnap = await auditRef.get();
+    let actualDocRef = auditRef;
+
+    if (!docSnap.exists) {
+      const q = await db.collection('audits').where('auditIdString', '==', id).get();
+      if (!q.empty) {
+        docSnap = q.docs[0];
+        actualDocRef = db.collection('audits').doc(docSnap.id);
+      }
+    }
+
+    if (!docSnap.exists) {
+      return res.status(404).json({ success: false, error: 'Audit record not found' });
+    }
+
+    const auditData = docSnap.data();
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
+    if (!isAuditForCustomer(auditData)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to modify this audit' });
+    }
+
+    const allow = Boolean(allowAuditorToSeeDocuments);
+
+    const timeline = Array.isArray(auditData.timeline) ? [...auditData.timeline] : [];
+    timeline.push({
+      event: allow ? 'Auditor Document Visibility Granted' : 'Auditor Document Visibility Restricted',
+      status: auditData.status || 'Scheduled',
+      timestamp: new Date().toISOString(),
+      actor: req.user?.name || req.user?.email || 'Customer',
+      notes: allow
+        ? 'Customer permitted auditor to view vendor compliance documents during calculation.'
+        : 'Customer restricted auditor from viewing vendor compliance documents.'
+    });
+
+    await actualDocRef.update({
+      allowAuditorToSeeDocuments: allow,
+      timeline
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: allow
+        ? 'Auditor has been granted access to view vendor documents for this audit.'
+        : 'Auditor document access has been restricted for this audit.',
+      allowAuditorToSeeDocuments: allow
+    });
+  } catch (error) {
+    console.error('updateAuditorDocumentAccess error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error updating document access' });
+  }
+};
+
+/**
+ * Configure whether Interview Audit (Add Resources) is enabled for an audit
+ */
+exports.updateInterviewAuditAccess = async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+    const { interviewAudit, allow } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Audit ID is required' });
+    }
+
+    const auditRef = db.collection('audits').doc(id);
+    let docSnap = await auditRef.get();
+    let actualDocRef = auditRef;
+
+    if (!docSnap.exists) {
+      const q = await db.collection('audits').where('auditIdString', '==', id).get();
+      if (!q.empty) {
+        docSnap = q.docs[0];
+        actualDocRef = db.collection('audits').doc(docSnap.id);
+      }
+    }
+
+    if (!docSnap.exists) {
+      return res.status(404).json({ success: false, error: 'Audit record not found' });
+    }
+
+    const auditData = docSnap.data();
+    const { isAuditForCustomer } = await getCustomerIdentity(req, db);
+    if (!isAuditForCustomer(auditData)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to modify this audit' });
+    }
+
+    const isEnabled = Boolean(interviewAudit !== undefined ? interviewAudit : allow);
+
+    const timeline = Array.isArray(auditData.timeline) ? [...auditData.timeline] : [];
+    timeline.push({
+      event: isEnabled ? 'Interview Audit Enabled' : 'Interview Audit Disabled',
+      status: auditData.status || 'Scheduled',
+      timestamp: new Date().toISOString(),
+      actor: req.user?.name || req.user?.email || 'Customer',
+      notes: isEnabled
+        ? 'Customer enabled Interview Audit (Add Resources) for the auditor.'
+        : 'Customer disabled Interview Audit for the auditor.'
+    });
+
+    await actualDocRef.update({
+      interviewAudit: isEnabled,
+      isInterviewAuditEnabled: isEnabled,
+      timeline
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: isEnabled
+        ? 'Interview Audit has been enabled for this audit.'
+        : 'Interview Audit has been disabled for this audit.',
+      interviewAudit: isEnabled
+    });
+  } catch (error) {
+    console.error('updateInterviewAuditAccess error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error updating interview audit status' });
+  }
+};
+

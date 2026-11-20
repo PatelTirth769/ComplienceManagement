@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getVendorDashboardStats } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 export const VendorDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -175,7 +176,7 @@ export const VendorDashboard: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8375rem', color: '#64748B' }}>
                   <span>Assigned Auditor: <strong style={{ color: '#0B1F3A' }}>{activeAudit.auditorName || activeAudit.auditor || 'Auditor'}</strong></span>
                   {activeAudit.createdAt && (
-                    <span>• Initiated: <strong style={{ color: '#0B1F3A' }}>{new Date(activeAudit.createdAt).toLocaleDateString()}</strong></span>
+                    <span>• Initiated: <strong style={{ color: '#0B1F3A' }}>{formatDate(activeAudit.createdAt)}</strong></span>
                   )}
                 </div>
               </div>
@@ -226,7 +227,15 @@ export const VendorDashboard: React.FC = () => {
       {/* 4 Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem', animation: 'fadeIn 0.4s ease 0.15s both' }}>
         {/* Progress Card */}
-        <div style={{ background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+        <div 
+          onClick={() => navigate(activeAudit ? `/vendor/audits/${activeAudit.id}` : '/vendor/audits')}
+          style={{ 
+            background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', 
+            boxShadow: '0 1px 4px rgba(0,0,0,0.03)', cursor: 'pointer', transition: 'all 0.2s ease' 
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.03)'; }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Audit Progress</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -240,7 +249,15 @@ export const VendorDashboard: React.FC = () => {
         </div>
 
         {/* Documents Card */}
-        <div style={{ background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+        <div 
+          onClick={() => navigate('/vendor/documents')}
+          style={{ 
+            background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', 
+            boxShadow: '0 1px 4px rgba(0,0,0,0.03)', cursor: 'pointer', transition: 'all 0.2s ease' 
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.03)'; }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Documents</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -254,7 +271,15 @@ export const VendorDashboard: React.FC = () => {
         </div>
 
         {/* Open Findings Card */}
-        <div style={{ background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+        <div 
+          onClick={() => navigate('/vendor/findings')}
+          style={{ 
+            background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', 
+            boxShadow: '0 1px 4px rgba(0,0,0,0.03)', cursor: 'pointer', transition: 'all 0.2s ease' 
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.03)'; }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Open Findings</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: stats?.openFindings > 0 ? '#FEF2F2' : '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -270,7 +295,15 @@ export const VendorDashboard: React.FC = () => {
         </div>
 
         {/* Compliance Score Card */}
-        <div style={{ background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+        <div 
+          onClick={() => navigate('/vendor/reports')}
+          style={{ 
+            background: 'white', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '1.25rem', 
+            boxShadow: '0 1px 4px rgba(0,0,0,0.03)', cursor: 'pointer', transition: 'all 0.2s ease' 
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.03)'; }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Compliance Score</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -383,7 +416,7 @@ export const VendorDashboard: React.FC = () => {
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1565C0', marginTop: '6px', flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: '0.8375rem', fontWeight: 700, color: '#0B1F3A' }}>{event.event}</div>
-                      <div style={{ fontSize: '0.725rem', color: '#64748B' }}>{new Date(event.timestamp).toLocaleString()}</div>
+                      <div style={{ fontSize: '0.725rem', color: '#64748B' }}>{formatDateTime(event.timestamp)}</div>
                       {event.notes && <div style={{ fontSize: '0.775rem', color: '#475569', marginTop: '0.15rem' }}>{event.notes}</div>}
                     </div>
                   </div>

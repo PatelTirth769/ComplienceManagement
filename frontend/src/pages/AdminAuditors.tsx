@@ -3,9 +3,10 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   UserCheck, Search, Loader2, Plus, 
   Mail, CheckCircle2, ShieldCheck, Phone, X, Eye, Trash2, AlertTriangle,
-  Building2, Users, FileCheck, ClipboardList, BarChart3
+  Building2, Users, FileCheck, ClipboardList, BarChart3, Scale
 } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
+import { getAdminSidebarItems } from '../utils/adminNavigation';
 
 export const AdminAuditors: React.FC = () => {
   const [auditors, setAuditors] = useState<any[]>([]);
@@ -22,15 +23,7 @@ export const AdminAuditors: React.FC = () => {
   const [deleteError, setDeleteError] = useState('');
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const sidebarItems = [
-    { name: 'Dashboard', icon: FileCheck, path: '/admin' },
-    { name: 'Vendors', icon: Building2, path: '/admin/vendors' },
-    { name: 'Customers', icon: Users, path: '/admin/customers' },
-    { name: 'Auditors', icon: UserCheck, active: true, path: '/admin/auditors' },
-    { name: 'Audits', icon: FileCheck, path: '/admin/audits' },
-    { name: 'Checklist', icon: ClipboardList, path: '/admin/checklist' },
-    { name: 'Reports', icon: BarChart3, path: '/admin/reports' },
-  ];
+  const sidebarItems = getAdminSidebarItems('Auditors');
 
   const fetchAuditors = async () => {
     setIsLoading(true);

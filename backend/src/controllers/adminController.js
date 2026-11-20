@@ -1,6 +1,12 @@
+const fs = require('fs');
+const path = require('path');
 const { getDb } = require('../config/firebase');
 const bcrypt = require('bcryptjs');
 const checklistService = require('../services/checklistService');
+const emailService = require('../services/emailService');
+const { parseFlexibleDate, calculateAuditCycle, toIsoDate, formatDate } = require('../utils/dateUtils');
+
+const actRulesFilePath = path.join(__dirname, '../data/actRules.json');
 
 // Checklist Management
 exports.getChecklists = async (req, res) => {
@@ -46,8 +52,141 @@ exports.updateChecklistItem = async (req, res) => {
   }
 };
 
+// Act Rules Management
+exports.getActRules = async (req, res) => {
+  try {
+    let rules = [];
+    if (fs.existsSync(actRulesFilePath)) {
+      try {
+        rules = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+      } catch (err) {
+        console.warn('Error reading actRules.json:', err.message);
+      }
+    }
+    
+    // Also try to read from Firestore if available
+    try {
+      const db = getDb();
+      if (db) {
+        const rulesRef = db.collection('act_rules');
+        const snap = await rulesRef.get();
+        if (!snap.empty) {
+          const dbRules = [];
+          snap.forEach(doc => {
+            dbRules.push({ id: doc.id, ...doc.data() });
+          });
+          if (dbRules.length > 0) {
+            const dbMap = new Map(dbRules.map(r => [r.id, r]));
+            rules = rules.map(r => {
+              const matched = dbMap.get(r.id);
+              return matched ? { ...r, ...matched } : r;
+            });
+            dbRules.forEach(dbr => {
+              if (!rules.some(r => r.id === dbr.id)) {
+                rules.push(dbr);
+              }
+            });
+          }
+        }
+      }
+    } catch (dbErr) {
+      // Non-fatal, local actRules.json is source of truth
+    }
+
+    res.status(200).json({ success: true, rules });
+  } catch (error) {
+    console.error('getActRules error:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve Act rules' });
+  }
+};
+
+exports.saveActRules = async (req, res) => {
+  try {
+    const { rules } = req.body;
+    if (!Array.isArray(rules)) {
+      return res.status(400).json({ success: false, error: 'Invalid payload: rules must be an array' });
+    }
+
+    const updatedRules = rules.map(r => ({
+      ...r,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.user ? req.user.email || req.user.name || 'Admin' : 'Admin'
+    }));
+
+    fs.writeFileSync(actRulesFilePath, JSON.stringify(updatedRules, null, 2), 'utf-8');
+
+    try {
+      const db = getDb();
+      if (db) {
+        const batch = db.batch();
+        updatedRules.forEach(r => {
+          const docRef = db.collection('act_rules').doc(r.id || r.shortName);
+          batch.set(docRef, r, { merge: true });
+        });
+        await batch.commit();
+      }
+    } catch (dbErr) {
+      console.warn('Firestore act_rules batch commit warning:', dbErr.message);
+    }
+
+    res.status(200).json({ success: true, message: 'Rules saved successfully', rules: updatedRules });
+  } catch (error) {
+    console.error('saveActRules error:', error);
+    res.status(500).json({ success: false, error: 'Failed to save Act rules' });
+  }
+};
+
+exports.saveActRuleById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description } = req.body;
+    if (typeof description !== 'string') {
+      return res.status(400).json({ success: false, error: 'Description must be a string' });
+    }
+
+    let rules = [];
+    if (fs.existsSync(actRulesFilePath)) {
+      rules = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+    }
+
+    const idx = rules.findIndex(r => r.id === id || r.shortName === id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'Act rule not found' });
+    }
+
+    rules[idx].description = description;
+    rules[idx].updatedAt = new Date().toISOString();
+    rules[idx].updatedBy = req.user ? req.user.email || req.user.name || 'Admin' : 'Admin';
+
+    fs.writeFileSync(actRulesFilePath, JSON.stringify(rules, null, 2), 'utf-8');
+
+    try {
+      const db = getDb();
+      if (db) {
+        await db.collection('act_rules').doc(rules[idx].id).set(rules[idx], { merge: true });
+      }
+    } catch (dbErr) {
+      console.warn('Firestore single rule update warning:', dbErr.message);
+    }
+
+    res.status(200).json({ success: true, message: 'Act rule updated successfully', rule: rules[idx] });
+  } catch (error) {
+    console.error('saveActRuleById error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update Act rule' });
+  }
+};
+
+let dashboardStatsCache = null;
+let dashboardStatsCacheTime = 0;
+const STATS_CACHE_TTL_MS = 30000; // 30 seconds
+
 exports.getDashboardStats = async (req, res) => {
   try {
+    const now = Date.now();
+    if (dashboardStatsCache && (now - dashboardStatsCacheTime < STATS_CACHE_TTL_MS)) {
+      return res.status(200).json(dashboardStatsCache);
+    }
+
     const db = getDb();
     
     const usersRef = db.collection('users');
@@ -104,11 +243,13 @@ exports.getDashboardStats = async (req, res) => {
         status: data.status || 'Scheduled',
         auditPeriod: data.auditPeriod || 'Q3 2026',
         score: data.score !== undefined ? data.score : null,
-        dueDate: data.dueDate || new Date().toISOString()
+        dueDate: data.dueDate || new Date().toISOString(),
+        auditType: data.auditType || 'Original',
+        isReadOnly: !!data.isReadOnly
       });
     });
 
-    res.status(200).json({
+    const result = {
       success: true,
       stats: {
         totalCustomers,
@@ -120,7 +261,11 @@ exports.getDashboardStats = async (req, res) => {
         pendingReviews,
         recentAudits: recentAudits.reverse().slice(0, 10)
       }
-    });
+    };
+    dashboardStatsCache = result;
+    dashboardStatsCacheTime = now;
+
+    res.status(200).json(result);
   } catch (error) {
     console.error('getDashboardStats error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -184,6 +329,8 @@ exports.createUser = async (req, res) => {
 
     const docRef = await usersRef.add(newUser);
     delete newUser.password;
+    cachedUsersMapTime = 0;
+    dashboardStatsCacheTime = 0;
 
     res.status(201).json({
       success: true,
@@ -219,6 +366,8 @@ exports.deleteUser = async (req, res) => {
     }
 
     await userRef.delete();
+    cachedUsersMapTime = 0;
+    dashboardStatsCacheTime = 0;
 
     return res.status(200).json({
       success: true,
@@ -230,20 +379,104 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+const LOCAL_AUDITS_FILE = path.resolve(__dirname, '../data/audits_cache.json');
+
+function loadLocalAuditsCache() {
+  try {
+    if (fs.existsSync(LOCAL_AUDITS_FILE)) {
+      const content = fs.readFileSync(LOCAL_AUDITS_FILE, 'utf8');
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+function saveLocalAuditsCache(audits) {
+  try {
+    fs.writeFileSync(LOCAL_AUDITS_FILE, JSON.stringify(audits, null, 2), 'utf8');
+  } catch (e) {
+    // ignore
+  }
+}
+
+let auditsCache = loadLocalAuditsCache();
+let auditsCacheTime = auditsCache ? Date.now() : 0;
+const CACHE_TTL_MS = 60000; // 60 seconds (Updates immediately on write operations)
+
+let cachedUsersMap = null;
+let cachedUsersMapTime = 0;
+const USERS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache for user names
+
+exports.invalidateAuditsCache = (auditId, patch) => {
+  auditsCacheTime = 0;
+  dashboardStatsCacheTime = 0;
+  if (auditsCache && Array.isArray(auditsCache)) {
+    let found = false;
+    auditsCache = auditsCache.map(a => {
+      if (a.id === auditId || a.auditIdString === auditId) {
+        found = true;
+        return { ...a, ...patch };
+      }
+      if (patch && Array.isArray(patch.interviewResources) && Array.isArray(a.interviewResources)) {
+        let modified = false;
+        const synced = a.interviewResources.map(ex => {
+          const match = patch.interviewResources.find(pr => (pr.id && pr.id === ex.id) || (pr.loginId && pr.loginId === ex.loginId));
+          if (match) {
+            modified = true;
+            return {
+              ...ex,
+              answer: match.answer !== undefined ? match.answer : ex.answer,
+              questions: match.questions || ex.questions,
+              status: match.status || ex.status
+            };
+          }
+          return ex;
+        });
+        if (modified) {
+          return { ...a, interviewResources: synced };
+        }
+      }
+      return a;
+    });
+    if (!found && patch) {
+      auditsCache.unshift({ id: auditId, ...patch });
+    }
+    saveLocalAuditsCache(auditsCache);
+  }
+};
+
 exports.getAudits = async (req, res) => {
   try {
+    const now = Date.now();
+    const forceFresh = req.query && req.query.fresh === 'true';
+    if (!forceFresh && auditsCache && (now - auditsCacheTime < CACHE_TTL_MS)) {
+      return res.status(200).json({ success: true, audits: auditsCache });
+    }
+
     const db = getDb();
     const auditsRef = db.collection('audits');
     const snapshot = await auditsRef.orderBy('createdAt', 'desc').get();
     const excelReportService = require('../services/excelReportService');
     
-    // Resolve user IDs to real human/company names
-    const usersSnapshot = await db.collection('users').get();
-    const usersMap = {};
-    usersSnapshot.forEach(uDoc => {
-      const u = uDoc.data();
-      usersMap[uDoc.id] = u.companyName || u.organisation || u.fullName || u.name || u.contactPerson || uDoc.id;
-    });
+    // Resolve user IDs to real human/company names using cached map to avoid reading users collection on every request
+    let usersMap = {};
+    if (cachedUsersMap && (now - cachedUsersMapTime < USERS_CACHE_TTL_MS)) {
+      usersMap = cachedUsersMap;
+    } else {
+      try {
+        const usersSnapshot = await db.collection('users').get();
+        usersSnapshot.forEach(uDoc => {
+          const u = uDoc.data();
+          usersMap[uDoc.id] = u.companyName || u.organisation || u.fullName || u.name || u.contactPerson || uDoc.id;
+        });
+        cachedUsersMap = usersMap;
+        cachedUsersMapTime = now;
+      } catch (uErr) {
+        if (cachedUsersMap) usersMap = cachedUsersMap;
+      }
+    }
 
     const audits = [];
     snapshot.forEach(doc => {
@@ -268,6 +501,8 @@ exports.getAudits = async (req, res) => {
       audits.push({
         id: doc.id,
         ...data,
+        auditType: data.auditType || 'Original',
+        isReadOnly: data.isReadOnly === true,
         customerName,
         vendorName,
         auditorName,
@@ -279,38 +514,86 @@ exports.getAudits = async (req, res) => {
         completionPercentage
       });
     });
+
+    auditsCache = audits;
+    auditsCacheTime = Date.now();
+    saveLocalAuditsCache(audits);
+
     res.status(200).json({ success: true, audits });
   } catch (error) {
-    console.error('getAudits error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.warn('[getAudits Warning]: Serving cached audits due to DB error / quota limit:', error.message);
+    const fallback = auditsCache || loadLocalAuditsCache() || [];
+    return res.status(200).json({ success: true, audits: fallback, cached: true });
   }
 };
 
 exports.createAudit = async (req, res) => {
   try {
     const db = getDb();
-    const { customerId, vendorId, auditorId, auditPeriod, startDate, dueDate, establishmentType, country, state, ...otherInfo } = req.body;
+    const { 
+      customerId, 
+      vendorId, 
+      auditorId, 
+      auditPeriod, 
+      startDate, 
+      dueDate, 
+      establishmentType, 
+      country, 
+      state,
+      auditFrequency,
+      auditYear,
+      periodSelection,
+      ...otherInfo 
+    } = req.body;
 
-    if (!customerId || !vendorId || !auditorId || !auditPeriod || !startDate || !dueDate) {
+    // Resolve or calculate cycle parameters
+    let cycleInfo = null;
+    if (auditFrequency && auditYear) {
+      cycleInfo = calculateAuditCycle(auditFrequency, auditYear, periodSelection);
+      if (!cycleInfo) {
+        return res.status(400).json({ success: false, error: 'Invalid audit frequency, year, or period selection.' });
+      }
+    }
+
+    const finalAuditPeriod = auditPeriod || (cycleInfo ? cycleInfo.summary : null);
+    const finalStartDate = startDate || (cycleInfo ? cycleInfo.startDate : null);
+    const finalDueDate = dueDate || (cycleInfo ? cycleInfo.dueDate : null);
+
+    if (!customerId || !vendorId || !auditorId || !finalAuditPeriod || !finalStartDate || !finalDueDate) {
       return res.status(400).json({ success: false, error: 'Missing required audit fields' });
     }
 
-    if (new Date(dueDate) < new Date(startDate)) {
+    const sDate = parseFlexibleDate(finalStartDate);
+    const dDate = parseFlexibleDate(finalDueDate);
+    if (!sDate || !dDate) {
+      return res.status(400).json({ success: false, error: 'Invalid start or due date format' });
+    }
+    if (dDate < sDate) {
       return res.status(400).json({ success: false, error: 'Due date cannot be before start date' });
     }
 
     // Check for duplicates
     const auditsRef = db.collection('audits');
-    const dupSnapshot = await auditsRef
+    const existingAuditsSnapshot = await auditsRef
       .where('vendorId', '==', vendorId)
-      .where('auditPeriod', '==', auditPeriod)
       .get();
     
-    if (!dupSnapshot.empty) {
+    const isDup = existingAuditsSnapshot.docs.some(doc => {
+      const data = doc.data();
+      const p = (data.auditPeriod || '').trim().toLowerCase();
+      const newP = (finalAuditPeriod || '').trim().toLowerCase();
+      if (p === newP) return true;
+      const cleanExisting = p.replace(/[–—]/g, '-').split('(')[0].trim();
+      const cleanNew = newP.replace(/[–—]/g, '-').split('(')[0].trim();
+      if (cleanExisting && cleanNew && cleanExisting === cleanNew) return true;
+      return false;
+    });
+
+    if (isDup) {
       return res.status(400).json({ success: false, error: 'An audit for this vendor in this period already exists' });
     }
 
-    // Generate AUD-2026-XXXX ID
+    // Generate AUD-YYYY-XXXX ID
     const countSnapshot = await auditsRef.get();
     const count = countSnapshot.size + 1;
     const year = new Date().getFullYear();
@@ -318,8 +601,10 @@ exports.createAudit = async (req, res) => {
 
     // Fetch user names for denormalization
     let customerName = 'N/A';
+    let customerEmail = '';
     let vendorName = 'N/A';
     let auditorName = 'N/A';
+    let vendorEmail = '';
 
     try {
       const [custDoc, venDoc, audDoc] = await Promise.all([
@@ -327,36 +612,155 @@ exports.createAudit = async (req, res) => {
         db.collection('users').doc(vendorId).get(),
         db.collection('users').doc(auditorId).get()
       ]);
-      if (custDoc.exists) customerName = custDoc.data().name || custDoc.data().organisation || custDoc.data().companyName || 'Customer';
-      if (venDoc.exists) vendorName = venDoc.data().name || venDoc.data().companyName || 'Vendor';
+      if (custDoc.exists) {
+        const cd = custDoc.data();
+        customerName = cd.name || cd.organisation || cd.companyName || cd.fullName || 'Customer';
+        customerEmail = cd.email || '';
+      }
+      if (venDoc.exists) {
+        vendorName = venDoc.data().name || venDoc.data().companyName || 'Vendor';
+        vendorEmail = venDoc.data().email || '';
+      }
       if (audDoc.exists) auditorName = audDoc.data().name || 'Auditor';
     } catch (e) {
       console.warn('Error fetching names for new audit:', e.message);
     }
 
+    const isoStart = toIsoDate(sDate);
+    const isoDue = toIsoDate(dDate);
+
+    const initialTimeline = [
+      {
+        event: 'Audit Scheduled',
+        status: 'Scheduled',
+        timestamp: new Date().toISOString(),
+        actor: req.user?.email || 'Admin',
+        notes: `Statutory compliance audit ${auditIdString} scheduled for ${vendorName} (${finalAuditPeriod}).`
+      }
+    ];
+
+    // Snapshot current Act rules / laws for this specific audit
+    let actRulesSnapshot = [];
+    if (fs.existsSync(actRulesFilePath)) {
+      try {
+        actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+      } catch (err) {
+        console.warn('Error reading actRules.json for snapshot:', err.message);
+      }
+    }
+    try {
+      const dbSnap = await db.collection('act_rules').get();
+      if (!dbSnap.empty) {
+        const dbRules = [];
+        dbSnap.forEach(d => dbRules.push({ id: d.id, ...d.data() }));
+        if (dbRules.length > 0) {
+          const dbMap = new Map(dbRules.map(r => [r.id, r]));
+          actRulesSnapshot = actRulesSnapshot.map(r => {
+            const matched = dbMap.get(r.id);
+            return matched ? { ...r, ...matched } : r;
+          });
+        }
+      }
+    } catch (e) {}
+
     const newAudit = {
       auditIdString,
+      auditType: req.body.auditType || 'Original',
+      isReadOnly: false,
       customerId,
       customerName,
+      customerEmail,
       organisation: customerName,
       vendorId,
       vendorName,
+      vendorEmail,
       auditorId,
       auditorName,
       auditor: auditorName,
-      auditPeriod,
-      startDate,
-      dueDate,
+      auditPeriod: finalAuditPeriod,
+      auditFrequency: auditFrequency || (cycleInfo ? cycleInfo.frequency : 'Quarterly'),
+      auditYear: auditYear ? Number(auditYear) : (cycleInfo ? cycleInfo.year : sDate.getFullYear()),
+      periodSelection: periodSelection || (cycleInfo ? cycleInfo.period : ''),
+      startDate: isoStart,
+      dueDate: isoDue,
       establishmentType: establishmentType || '',
       country: country || 'India',
       state: state || 'N/A',
       status: 'Scheduled',
       createdAt: new Date().toISOString(),
       score: null,
+      timeline: initialTimeline,
+      actRules: actRulesSnapshot,
       ...otherInfo
     };
 
     const docRef = await auditsRef.add(newAudit);
+
+    // CRITICAL: Immediate Cache Synchronization for instant UI display
+    try {
+      const createdAuditListItem = {
+        id: docRef.id,
+        ...newAudit,
+        auditType: newAudit.auditType || 'Original',
+        isReadOnly: false,
+        customerName: newAudit.customerName,
+        vendorName: newAudit.vendorName,
+        auditorName: newAudit.auditorName,
+        compliantCount: 0,
+        nonCompliantCount: 0,
+        totalApplicable: 0,
+        naCount: 0,
+        findingsCount: 0,
+        completionPercentage: 0
+      };
+
+      let freshAudits = loadLocalAuditsCache() || auditsCache || [];
+      freshAudits = [createdAuditListItem, ...freshAudits.filter(a => a.id !== docRef.id)];
+      auditsCache = freshAudits;
+      auditsCacheTime = Date.now();
+      dashboardStatsCacheTime = 0; // force stats cache refresh
+      saveLocalAuditsCache(freshAudits);
+    } catch (cacheErr) {
+      console.warn('[Admin Controller createAudit]: Cache sync warning:', cacheErr.message);
+    }
+
+    // Send immediate email and notification to vendor regarding newly scheduled audit
+    if (vendorEmail) {
+      emailService.sendAuditScheduledEmail({
+        vendorEmail,
+        vendorName,
+        customerName,
+        auditorName,
+        auditIdString,
+        auditPeriod: finalAuditPeriod,
+        startDate: formatDate(isoStart),
+        dueDate: formatDate(isoDue),
+        establishmentType: establishmentType || '',
+        state: state || 'N/A',
+        portalUrl: req.get('origin') || (req.get('referer') ? new URL(req.get('referer')).origin : null) || process.env.FRONTEND_URL || 'http://localhost:5174'
+      }).then(emailRes => {
+        if (emailRes && emailRes.success) {
+          console.log(`[Admin Controller]: Immediate audit scheduled email successfully sent to ${vendorEmail} for audit ${auditIdString}`);
+        }
+      }).catch(err => {
+        console.warn(`[Admin Controller]: Failed to send scheduled audit email to ${vendorEmail}:`, err.message);
+      });
+
+      // Also create an in-app notification in vendor portal
+      db.collection('notifications').add({
+        userId: vendorId,
+        role: 'Vendor',
+        title: '📋 New Audit Scheduled: Action Required',
+        message: `Audit ${auditIdString} (${finalAuditPeriod}) has been scheduled. Please upload your statutory compliance documents.`,
+        auditId: docRef.id,
+        type: 'audit_scheduled',
+        read: false,
+        createdAt: new Date().toISOString()
+      }).catch(notifErr => {
+        console.warn('[Admin Controller]: Could not create in-app notification:', notifErr.message);
+      });
+    }
+
     res.status(201).json({ success: true, message: 'Audit created successfully', audit: { id: docRef.id, ...newAudit } });
   } catch (error) {
     console.error('createAudit error:', error);
@@ -571,11 +975,68 @@ exports.getAuditById = async (req, res) => {
     const findingsPending = auditData.findingsPending ?? nonCompliantItems.filter(f => f.vendorResponse && f.status !== 'Resolved').length;
     const findingsOpen = auditData.findingsOpen ?? Math.max(0, findingsCount - findingsResolved - findingsPending);
 
+    // Resolve actRules snapshot for this audit
+    let actRulesSnapshot = auditData.actRules;
+    if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
+      if (fs.existsSync(actRulesFilePath)) {
+        try {
+          actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+        } catch (e) {
+          actRulesSnapshot = [];
+        }
+      } else {
+        actRulesSnapshot = [];
+      }
+    }
+
+    // Enrich responses with checklist metadata if missing
+    let enrichedResponses = auditData.responses;
+    try {
+      const allChecklists = checklistService.getAllChecklists();
+      const checklistMap = new Map();
+      [...(allChecklists.otherVendor || []), ...(allChecklists.securityVendor || []), ...(allChecklists.stateVendor || [])].forEach(it => {
+        if (it && it.id) checklistMap.set(it.id, it);
+      });
+
+      if (Array.isArray(auditData.responses)) {
+        enrichedResponses = auditData.responses.map(r => {
+          const itemInfo = checklistMap.get(r.itemId || r.id) || {};
+          return {
+            ...r,
+            itemId: r.itemId || r.id,
+            type: r.type || itemInfo.type || itemInfo.actNameInShort || '',
+            actNameInShort: r.actNameInShort || itemInfo.actNameInShort || itemInfo.type || '',
+            nameOfAct: r.nameOfAct || itemInfo.nameOfAct || '',
+            title: r.title || itemInfo.title || '',
+            particulars: r.particulars || itemInfo.particulars || itemInfo.description || ''
+          };
+        });
+      } else if (typeof auditData.responses === 'object' && auditData.responses !== null) {
+        enrichedResponses = Object.entries(auditData.responses).map(([k, v]) => {
+          const itemInfo = checklistMap.get(k) || {};
+          const base = typeof v === 'object' && v !== null ? v : { status: String(v) };
+          return {
+            ...base,
+            itemId: k,
+            type: base.type || itemInfo.type || itemInfo.actNameInShort || '',
+            actNameInShort: base.actNameInShort || itemInfo.actNameInShort || itemInfo.type || '',
+            nameOfAct: base.nameOfAct || itemInfo.nameOfAct || '',
+            title: base.title || itemInfo.title || '',
+            particulars: base.particulars || itemInfo.particulars || itemInfo.description || ''
+          };
+        });
+      }
+    } catch (enrichErr) {
+      console.warn('Error enriching responses in getAuditById:', enrichErr.message);
+    }
+
     res.status(200).json({ 
       success: true, 
       audit: { 
         id: docRef.id, 
         ...auditData,
+        auditType: auditData.auditType || 'Original',
+        isReadOnly: auditData.isReadOnly === true,
         summary,
         categoryScores,
         nonCompliantItems,
@@ -587,6 +1048,8 @@ exports.getAuditById = async (req, res) => {
         findingsOpen,
         findingsResolved,
         findingsPending,
+        actRules: actRulesSnapshot,
+        responses: enrichedResponses || auditData.responses,
         customerName: customerName || auditData.customerId,
         vendorName: vendorName || auditData.vendorId,
         auditorName: auditorName || auditData.auditorId
@@ -654,95 +1117,196 @@ exports.deleteAudit = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: Admin access required to delete audits' });
     }
 
-    // 1. Locate audit doc in 'audits' or 'compliance_audits'
     const auditsRef = db.collection('audits');
-    const auditDocRef = auditsRef.doc(id);
-    const auditSnap = await auditDocRef.get();
-
-    let legacyDocRef = null;
-    let legacySnap = null;
     const compAuditsRef = db.collection('compliance_audits');
-    const compSnap = await compAuditsRef.doc(id).get();
-    if (compSnap.exists) {
-      legacyDocRef = compAuditsRef.doc(id);
-      legacySnap = compSnap;
+
+    // 1. Locate target audit doc in 'audits' or 'compliance_audits' or local cache
+    let targetDocSnap = null;
+
+    // Check direct doc ID in audits
+    let docSnap = await auditsRef.doc(id).get().catch(() => null);
+    if (docSnap && docSnap.exists) {
+      targetDocSnap = docSnap;
+    } else {
+      // Check by auditIdString
+      const q = await auditsRef.where('auditIdString', '==', id).get().catch(() => null);
+      if (q && !q.empty) {
+        targetDocSnap = q.docs[0];
+      } else {
+        // Check in compliance_audits
+        const compSnap = await compAuditsRef.doc(id).get().catch(() => null);
+        if (compSnap && compSnap.exists) {
+          targetDocSnap = compSnap;
+        } else {
+          const compQ = await compAuditsRef.where('auditIdString', '==', id).get().catch(() => null);
+          if (compQ && !compQ.empty) {
+            targetDocSnap = compQ.docs[0];
+          }
+        }
+      }
     }
 
-    if (!auditSnap.exists && !legacySnap) {
+    // Also check local cache
+    const localCached = loadLocalAuditsCache() || [];
+    const cachedTarget = localCached.find(a => a.id === id || a.auditIdString === id);
+
+    if (!targetDocSnap && !cachedTarget) {
       return res.status(404).json({ success: false, error: 'Audit not found' });
     }
 
-    const auditData = auditSnap.exists ? auditSnap.data() : (legacySnap ? legacySnap.data() : {});
-    const auditIdString = auditData.auditIdString || id;
+    const targetData = targetDocSnap ? targetDocSnap.data() : (cachedTarget || {});
+    const targetAuditId = (targetDocSnap && targetDocSnap.id) || cachedTarget?.id || id;
+    const targetAuditIdString = targetData.auditIdString || cachedTarget?.auditIdString || id;
+    const baseAuditIdString = targetAuditIdString.replace(/-RA\d*$/, '');
 
-    // 2. Collect related Firestore documents & S3 keys
+    // 2. Collect ALL related audit document IDs and auditIdStrings (Cascade Original <-> Re-Audit)
+    const auditDocIdsToDelete = new Set();
+    const auditIdStringsToDelete = new Set();
+
+    auditDocIdsToDelete.add(targetAuditId);
+    auditIdStringsToDelete.add(targetAuditIdString);
+    if (baseAuditIdString) {
+      auditIdStringsToDelete.add(baseAuditIdString);
+    }
+
+    if (targetData.parentAuditId) auditDocIdsToDelete.add(targetData.parentAuditId);
+    if (targetData.originalAuditId) auditDocIdsToDelete.add(targetData.originalAuditId);
+    if (targetData.originalAuditIdString) auditIdStringsToDelete.add(targetData.originalAuditIdString);
+
+    // Look for all related audits in local cache (original <-> re-audits)
+    localCached.forEach(a => {
+      const aId = a.id;
+      const aStr = a.auditIdString || '';
+      const aBase = aStr.replace(/-RA\d*$/, '');
+      const isRelated = 
+        auditDocIdsToDelete.has(aId) ||
+        auditIdStringsToDelete.has(aStr) ||
+        (baseAuditIdString && aBase === baseAuditIdString) ||
+        (a.parentAuditId && auditDocIdsToDelete.has(a.parentAuditId)) ||
+        (a.originalAuditId && auditDocIdsToDelete.has(a.originalAuditId));
+
+      if (isRelated) {
+        if (aId) auditDocIdsToDelete.add(aId);
+        if (aStr) auditIdStringsToDelete.add(aStr);
+        if (aBase) auditIdStringsToDelete.add(aBase);
+        if (a.parentAuditId) auditDocIdsToDelete.add(a.parentAuditId);
+        if (a.originalAuditId) auditDocIdsToDelete.add(a.originalAuditId);
+      }
+    });
+
+    // Query Firestore for related original or re-audit docs
+    try {
+      if (targetAuditId) {
+        const relatedByParent = await auditsRef.where('parentAuditId', '==', targetAuditId).get().catch(() => null);
+        if (relatedByParent) {
+          relatedByParent.forEach(d => {
+            auditDocIdsToDelete.add(d.id);
+            if (d.data().auditIdString) auditIdStringsToDelete.add(d.data().auditIdString);
+          });
+        }
+      }
+
+      if (targetData.parentAuditId) {
+        const relatedSiblings = await auditsRef.where('parentAuditId', '==', targetData.parentAuditId).get().catch(() => null);
+        if (relatedSiblings) {
+          relatedSiblings.forEach(d => {
+            auditDocIdsToDelete.add(d.id);
+            if (d.data().auditIdString) auditIdStringsToDelete.add(d.data().auditIdString);
+          });
+        }
+      }
+
+      if (baseAuditIdString) {
+        const relatedByBase = await auditsRef.where('auditIdString', '==', baseAuditIdString).get().catch(() => null);
+        if (relatedByBase) {
+          relatedByBase.forEach(d => {
+            auditDocIdsToDelete.add(d.id);
+            if (d.data().auditIdString) auditIdStringsToDelete.add(d.data().auditIdString);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Firestore related audit query warning:', e.message);
+    }
+
+    // 3. Clean up Firestore documents, reports, and S3 objects for all related IDs
     const s3Service = require('../services/s3Service');
     const s3Keys = new Set();
 
-    // S3 prefix deletion for this audit
-    await s3Service.deleteObjectsByPrefix(`audits/${id}/`);
-    if (auditIdString && auditIdString !== id) {
-      await s3Service.deleteObjectsByPrefix(`audits/${auditIdString}/`);
+    for (const docId of auditDocIdsToDelete) {
+      await s3Service.deleteObjectsByPrefix(`audits/${docId}/`).catch(() => {});
+    }
+    for (const strId of auditIdStringsToDelete) {
+      await s3Service.deleteObjectsByPrefix(`audits/${strId}/`).catch(() => {});
     }
 
-    // Documents collection cleanup
-    const docsBatch = db.batch();
-    let docsToDeleteCount = 0;
+    // Cleanup documents & reports collections in Firestore
+    try {
+      const allIds = Array.from(new Set([...auditDocIdsToDelete, ...auditIdStringsToDelete]));
+      for (const aid of allIds) {
+        const docsSnap = await db.collection('documents').where('auditId', '==', aid).get().catch(() => null);
+        if (docsSnap && !docsSnap.empty) {
+          const batch = db.batch();
+          let bCount = 0;
+          docsSnap.forEach(d => {
+            if (d.data().s3Key) s3Keys.add(d.data().s3Key);
+            batch.delete(d.ref);
+            bCount++;
+          });
+          if (bCount > 0) await batch.commit().catch(() => {});
+        }
 
-    const docsByDocId = await db.collection('documents').where('auditId', '==', id).get();
-    docsByDocId.forEach(d => {
-      if (d.data().s3Key) s3Keys.add(d.data().s3Key);
-      docsBatch.delete(d.ref);
-      docsToDeleteCount++;
-    });
-
-    if (auditIdString && auditIdString !== id) {
-      const docsByStringId = await db.collection('documents').where('auditId', '==', auditIdString).get();
-      docsByStringId.forEach(d => {
-        if (d.data().s3Key) s3Keys.add(d.data().s3Key);
-        docsBatch.delete(d.ref);
-        docsToDeleteCount++;
-      });
+        const repSnap = await db.collection('reports').where('auditId', '==', aid).get().catch(() => null);
+        if (repSnap && !repSnap.empty) {
+          const batch = db.batch();
+          let bCount = 0;
+          repSnap.forEach(r => {
+            if (r.data().s3Key) s3Keys.add(r.data().s3Key);
+            batch.delete(r.ref);
+            bCount++;
+          });
+          if (bCount > 0) await batch.commit().catch(() => {});
+        }
+      }
+    } catch (docErr) {
+      console.warn('Cleanup documents/reports warning:', docErr.message);
     }
 
-    // Reports collection cleanup
-    const reportsByDocId = await db.collection('reports').where('auditId', '==', id).get();
-    reportsByDocId.forEach(r => {
-      if (r.data().s3Key) s3Keys.add(r.data().s3Key);
-      docsBatch.delete(r.ref);
-      docsToDeleteCount++;
-    });
-
-    if (auditIdString && auditIdString !== id) {
-      const reportsByStringId = await db.collection('reports').where('auditId', '==', auditIdString).get();
-      reportsByStringId.forEach(r => {
-        if (r.data().s3Key) s3Keys.add(r.data().s3Key);
-        docsBatch.delete(r.ref);
-        docsToDeleteCount++;
-      });
-    }
-
-    // Delete collected S3 keys
     for (const key of s3Keys) {
-      await s3Service.deleteFromS3(key);
+      await s3Service.deleteFromS3(key).catch(() => {});
     }
 
-    // Commit child document deletions in Firestore
-    if (docsToDeleteCount > 0) {
-      await docsBatch.commit();
+    // 4. Delete all collected audit documents from Firestore
+    for (const docId of auditDocIdsToDelete) {
+      await auditsRef.doc(docId).delete().catch(() => {});
+      await compAuditsRef.doc(docId).delete().catch(() => {});
     }
 
-    // 3. Delete main audit document and legacy compliance audit document
-    if (auditSnap.exists) {
-      await auditDocRef.delete();
-    }
-    if (legacyDocRef) {
-      await legacyDocRef.delete();
+    // 5. CRITICAL: Clean up from local memory cache and audits_cache.json
+    try {
+      let freshCache = loadLocalAuditsCache() || [];
+      freshCache = freshCache.filter(a => {
+        if (auditDocIdsToDelete.has(a.id)) return false;
+        if (a.auditIdString && auditIdStringsToDelete.has(a.auditIdString)) return false;
+        if (baseAuditIdString && (a.auditIdString || '').replace(/-RA\d*$/, '') === baseAuditIdString) return false;
+        if (a.parentAuditId && auditDocIdsToDelete.has(a.parentAuditId)) return false;
+        if (a.originalAuditId && auditDocIdsToDelete.has(a.originalAuditId)) return false;
+        return true;
+      });
+      auditsCache = freshCache;
+      auditsCacheTime = 0;
+      dashboardStatsCacheTime = 0;
+      saveLocalAuditsCache(freshCache);
+    } catch (cacheErr) {
+      console.warn('Local audits cache cleanup error:', cacheErr.message);
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Audit deleted successfully'
+      message: 'Audit and all associated re-audit records deleted successfully',
+      deletedIds: Array.from(auditDocIdsToDelete),
+      deletedIdStrings: Array.from(auditIdStringsToDelete),
+      baseAuditIdString
     });
   } catch (error) {
     console.error('deleteAudit error:', error);
@@ -798,6 +1362,20 @@ exports.downloadAuditExcel = async (req, res) => {
   } catch (error) {
     console.error('downloadAuditExcel Admin error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error generating Excel workbook' });
+  }
+};
+
+/**
+ * Manual trigger for automated vendor document upload reminders
+ */
+exports.triggerDocumentReminders = async (req, res) => {
+  try {
+    const reminderService = require('../services/reminderService');
+    const result = await reminderService.checkAndSendVendorDocumentReminders();
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('triggerDocumentReminders error:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

@@ -4,9 +4,10 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   LayoutDashboard, Building2, FileCheck, Clock, 
   BarChart3, Bell, ArrowLeft, Eye, ShieldCheck, AlertTriangle,
-  User, Calendar, CheckCircle2, FileText, Download, Lock, AlertCircle, RefreshCw, Presentation, FileBarChart
+  User, Calendar, CheckCircle2, FileText, Download, Lock, AlertCircle, RefreshCw, Presentation, FileBarChart, FolderOpen, Users
 } from 'lucide-react';
-import { getCustomerAuditById, API_BASE_URL } from '../services/api';
+import { getCustomerAuditById, updateAuditorDocumentAccess, updateInterviewAuditAccess, API_BASE_URL } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 export const CustomerAuditDetails: React.FC = () => {
   const { auditId } = useParams<{ auditId: string }>();
@@ -16,6 +17,8 @@ export const CustomerAuditDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [audit, setAudit] = useState<any | null>(null);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [updatingDocAccess, setUpdatingDocAccess] = useState(false);
+  const [updatingInterviewAudit, setUpdatingInterviewAudit] = useState(false);
 
   const sidebarItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/customer' },
@@ -51,6 +54,44 @@ export const CustomerAuditDetails: React.FC = () => {
   useEffect(() => {
     fetchAuditDetails();
   }, [auditId]);
+
+  const handleToggleAuditorDocAccess = async (targetAuditId: string, nextValue: boolean) => {
+    try {
+      setUpdatingDocAccess(true);
+      setAudit((prev: any) => prev ? { ...prev, allowAuditorToSeeDocuments: nextValue } : prev);
+      const res = await updateAuditorDocumentAccess(targetAuditId, nextValue);
+      if (!res.success) {
+        setAudit((prev: any) => prev ? { ...prev, allowAuditorToSeeDocuments: !nextValue } : prev);
+        alert(res.error || 'Failed to update document access permission.');
+      }
+    } catch (err: any) {
+      console.error('Error toggling document access:', err);
+      setAudit((prev: any) => prev ? { ...prev, allowAuditorToSeeDocuments: !nextValue } : prev);
+      const msg = err.response?.data?.error || err.message || 'Unable to update document access setting.';
+      alert(msg);
+    } finally {
+      setUpdatingDocAccess(false);
+    }
+  };
+
+  const handleToggleInterviewAudit = async (targetAuditId: string, nextValue: boolean) => {
+    try {
+      setUpdatingInterviewAudit(true);
+      setAudit((prev: any) => prev ? { ...prev, interviewAudit: nextValue } : prev);
+      const res = await updateInterviewAuditAccess(targetAuditId, nextValue);
+      if (!res.success) {
+        setAudit((prev: any) => prev ? { ...prev, interviewAudit: !nextValue } : prev);
+        alert(res.error || 'Failed to update interview audit setting.');
+      }
+    } catch (err: any) {
+      console.error('Error toggling interview audit:', err);
+      setAudit((prev: any) => prev ? { ...prev, interviewAudit: !nextValue } : prev);
+      const msg = err.response?.data?.error || err.message || 'Unable to update interview audit setting.';
+      alert(msg);
+    } finally {
+      setUpdatingInterviewAudit(false);
+    }
+  };
 
   const handleDownloadExcel = async () => {
     if (!audit) return;
@@ -176,6 +217,24 @@ export const CustomerAuditDetails: React.FC = () => {
                 {st.label}
               </span>
               <span style={{
+                display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.625rem',
+                borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
+                background: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#F3E8FF' : '#F1F5F9',
+                color: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#7E22CE' : '#334155',
+                border: `1px solid ${audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#D8B4FE' : '#CBD5E1'}`
+              }}>
+                {audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? 'Re-Audit' : 'Original Audit'}
+              </span>
+              {audit.isReadOnly && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.625rem',
+                  borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
+                  background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A'
+                }}>
+                  Superceded
+                </span>
+              )}
+              <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.625rem',
                 borderRadius: '999px', fontSize: '0.725rem', fontWeight: 700,
                 background: '#F8FAFC', color: '#64748B', border: '1px solid #CBD5E1'
@@ -205,6 +264,160 @@ export const CustomerAuditDetails: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Configuration Parameter: Auditor Document Visibility */}
+      <div style={{
+        background: audit.allowAuditorToSeeDocuments ? '#ECFDF5' : '#FFFBEB',
+        border: `1.5px solid ${audit.allowAuditorToSeeDocuments ? '#A7F3D0' : '#FDE68A'}`,
+        borderRadius: '14px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.5rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+        animation: 'fadeIn 0.3s ease 0.08s both'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: audit.allowAuditorToSeeDocuments ? '#D1FAE5' : '#FEF3C7',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <FolderOpen style={{ width: '20px', height: '20px', color: audit.allowAuditorToSeeDocuments ? '#059669' : '#D97706' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#0F172A' }}>
+              Do you want Auditor to see the Document which assign by Vendor?
+            </div>
+            <p style={{ fontSize: '0.7875rem', color: '#475569', margin: '0.2rem 0 0' }}>
+              {audit.allowAuditorToSeeDocuments
+                ? 'Auditor is permitted to inspect and download vendor-uploaded compliance documents during calculation in the Auditor Portal.'
+                : 'Auditor cannot see or download documents uploaded by the vendor during calculation until you permit.'}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{
+            fontSize: '0.8125rem', fontWeight: 800,
+            color: audit.allowAuditorToSeeDocuments ? '#047857' : '#92400E'
+          }}>
+            {audit.allowAuditorToSeeDocuments ? 'Access Granted' : 'Access Restricted'}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={audit.allowAuditorToSeeDocuments === true}
+            onClick={() => handleToggleAuditorDocAccess(audit.id, !audit.allowAuditorToSeeDocuments)}
+            disabled={updatingDocAccess}
+            title="Do you want Auditor to see the Document which assign by Vendor?"
+            style={{
+              width: '44px',
+              height: '24px',
+              borderRadius: '999px',
+              background: audit.allowAuditorToSeeDocuments ? '#059669' : '#CBD5E1',
+              border: `1.5px solid ${audit.allowAuditorToSeeDocuments ? '#047857' : '#94A3B8'}`,
+              position: 'relative',
+              cursor: updatingDocAccess ? 'wait' : 'pointer',
+              transition: 'all 0.2s ease',
+              padding: 0
+            }}
+          >
+            <span style={{
+              display: 'block',
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#FFFFFF',
+              position: 'absolute',
+              top: '1.5px',
+              left: audit.allowAuditorToSeeDocuments ? '22px' : '2px',
+              transition: 'left 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+            }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Configuration Parameter: Interview Audit (Add Resources) */}
+      <div style={{
+        background: audit.interviewAudit ? '#EFF6FF' : '#F8FAFC',
+        border: `1.5px solid ${audit.interviewAudit ? '#BFDBFE' : '#E2E8F0'}`,
+        borderRadius: '14px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.5rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+        animation: 'fadeIn 0.3s ease 0.09s both'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: audit.interviewAudit ? '#DBEAFE' : '#F1F5F9',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <Users style={{ width: '20px', height: '20px', color: audit.interviewAudit ? '#2563EB' : '#64748B' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#0F172A' }}>
+              Interview Audit (Add Resources Module)
+            </div>
+            <p style={{ fontSize: '0.7875rem', color: '#475569', margin: '0.2rem 0 0' }}>
+              {audit.interviewAudit
+                ? 'Interview Audit is enabled for the Auditor. The "Add Resources" schedule table is visible in the Auditor calculation portal.'
+                : 'Interview Audit is disabled. Auditor will not see the "Add Resources" section for this audit.'}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{
+            fontSize: '0.8125rem', fontWeight: 800,
+            color: audit.interviewAudit ? '#1D4ED8' : '#64748B'
+          }}>
+            {audit.interviewAudit ? 'Interview Enabled' : 'Disabled'}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={audit.interviewAudit === true}
+            onClick={() => handleToggleInterviewAudit(audit.id, !audit.interviewAudit)}
+            disabled={updatingInterviewAudit}
+            title="Toggle whether Interview Audit (Add Resources) is enabled for the Auditor"
+            style={{
+              width: '44px',
+              height: '24px',
+              borderRadius: '999px',
+              background: audit.interviewAudit ? '#2563EB' : '#CBD5E1',
+              border: `1.5px solid ${audit.interviewAudit ? '#1D4ED8' : '#94A3B8'}`,
+              position: 'relative',
+              cursor: updatingInterviewAudit ? 'wait' : 'pointer',
+              transition: 'all 0.2s ease',
+              padding: 0
+            }}
+          >
+            <span style={{
+              display: 'block',
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#FFFFFF',
+              position: 'absolute',
+              top: '1.5px',
+              left: audit.interviewAudit ? '22px' : '2px',
+              transition: 'left 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+            }} />
+          </button>
         </div>
       </div>
 
@@ -242,11 +455,11 @@ export const CustomerAuditDetails: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748B', fontWeight: 600 }}>Audit Start Date:</span>
-              <span style={{ fontWeight: 700, color: '#0B1F3A' }}>{audit.startDate || 'TBD'}</span>
+              <span style={{ fontWeight: 700, color: '#0B1F3A' }}>{formatDate(audit.startDate) || 'TBD'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748B', fontWeight: 600 }}>Audit Due Date:</span>
-              <span style={{ fontWeight: 700, color: '#0B1F3A' }}>{audit.dueDate || 'TBD'}</span>
+              <span style={{ fontWeight: 700, color: '#0B1F3A' }}>{formatDate(audit.dueDate) || 'TBD'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#64748B', fontWeight: 600 }}>Audit Progress:</span>
@@ -416,7 +629,7 @@ export const CustomerAuditDetails: React.FC = () => {
                 <div>
                   <div style={{ fontWeight: 700, color: '#0B1F3A', fontSize: '0.85rem' }}>{event.event || 'Audit Event'}</div>
                   <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
-                    Actor: <strong>{event.actor || 'System'}</strong> • Timestamp: {new Date(event.timestamp).toLocaleString()}
+                    Actor: <strong>{event.actor || 'System'}</strong> • Timestamp: {formatDateTime(event.timestamp)}
                   </div>
                   {event.notes && <div style={{ fontSize: '0.775rem', color: '#475569', marginTop: '4px', background: '#F8FAFC', padding: '0.375rem 0.625rem', borderRadius: '6px' }}>{event.notes}</div>}
                 </div>

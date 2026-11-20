@@ -1,6 +1,7 @@
 const XLSX = require('xlsx');
 const checklistService = require('./checklistService');
 const scoringService = require('./scoringService');
+const { formatDate, formatDateTime } = require('../utils/dateUtils');
 
 /**
  * Calculates completion percentage for an audit doc.
@@ -60,7 +61,7 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
   const summary = audit.summary || {};
   const summaryRows = [
     ['COMPLIANCE AUDIT COMPLETE REPORT', ''],
-    ['Generated At', new Date().toISOString()],
+    ['Generated At', formatDateTime(new Date())],
     ['', ''],
     ['METRIC / PROPERTY', 'VALUE'],
     ['Audit ID', audit.auditIdString || audit.id],
@@ -70,9 +71,9 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
     ['Customer / Client', audit.customerName || audit.organisation || 'N/A'],
     ['Auditor Name', audit.auditorName || audit.auditor || 'N/A'],
     ['Auditor ID', audit.auditorId || 'N/A'],
-    ['Start Date', audit.startDate || 'N/A'],
-    ['Due Date', audit.dueDate || 'N/A'],
-    ['Completion Date', audit.closedAt || audit.submittedAt || audit.updatedAt || new Date().toISOString()],
+    ['Start Date', formatDate(audit.startDate)],
+    ['Due Date', formatDate(audit.dueDate)],
+    ['Completion Date', formatDate(audit.closedAt || audit.submittedAt || audit.updatedAt || new Date())],
     ['Establishment Type', audit.establishmentType || 'General'],
     ['Site / Location', audit.site || audit.location || 'Default Site'],
     ['Audit Status', audit.status || 'Closed'],
@@ -208,7 +209,7 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
   const timelineRows = timelineEvents.map((t, idx) => ({
     'Milestone / Event': t.event || `Milestone ${idx + 1}`,
     'Status': t.status || 'Completed',
-    'Date & Time': t.timestamp ? new Date(t.timestamp).toLocaleString() : 'N/A',
+    'Date & Time': formatDateTime(t.timestamp),
     'Completed By / Actor': t.actor || 'System',
     'Notes / Description': t.notes || t.description || 'Milestone logged'
   }));
@@ -228,7 +229,7 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
     'File Name': d.fileName || 'Document File',
     'Category / Type': d.type || d.fileType || 'General Evidence',
     'Uploaded By': d.uploadedBy || d.uploader || 'Vendor / Auditor',
-    'Upload Date': d.uploadedAt ? new Date(d.uploadedAt).toLocaleString() : 'N/A',
+    'Upload Date': formatDateTime(d.uploadedAt),
     'Status': d.status || 'Verified',
     'S3 Key Reference': d.s3Key || `audits/${audit.id}/documents/${d.fileName}`
   }));

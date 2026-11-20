@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { FileCheck, Plus, Search, Loader2, Trash2, AlertTriangle, CheckCircle2, FileSpreadsheet, Filter, Eye } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
+import { formatDate } from '../utils/dateUtils';
 
 export const AdminAudits: React.FC = () => {
+  const location = useLocation();
   const [audits, setAudits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [auditTypeFilter, setAuditTypeFilter] = useState<'Original' | 'Re-Audit'>('Original');
 
   // Delete Audit state
   const [selectedAuditToDelete, setSelectedAuditToDelete] = useState<any | null>(null);
@@ -38,6 +41,16 @@ export const AdminAudits: React.FC = () => {
   };
 
   useEffect(() => {
+    if (location.state?.newAudit) {
+      const incoming = location.state.newAudit;
+      setAudits(prev => {
+        if (prev.some(a => a.id === incoming.id || a.auditIdString === incoming.auditIdString)) {
+          return prev;
+        }
+        return [incoming, ...prev];
+      });
+      window.history.replaceState({}, document.title);
+    }
     fetchAudits();
   }, []);
 
@@ -85,12 +98,37 @@ export const AdminAudits: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
+        const deletedIds = new Set<string>(data.deletedIds || [selectedAuditToDelete.id]);
+        const deletedStrings = new Set<string>(data.deletedIdStrings || [selectedAuditToDelete.auditIdString]);
+        const baseAuditString = data.baseAuditIdString || (selectedAuditToDelete.auditIdString || '').replace(/-RA\d*$/, '');
+
+        // Immediately remove all matching original and re-audits from local table state
+        setAudits(prev => prev.filter(a => {
+          if (deletedIds.has(a.id)) return false;
+          if (a.auditIdString && deletedStrings.has(a.auditIdString)) return false;
+          if (baseAuditString && (a.auditIdString || '').replace(/-RA\d*$/, '') === baseAuditString) return false;
+          if (a.parentAuditId && deletedIds.has(a.parentAuditId)) return false;
+          if (a.originalAuditId && deletedIds.has(a.originalAuditId)) return false;
+          return true;
+        }));
+
         setSelectedAuditToDelete(null);
-        setToastMessage({ type: 'success', text: 'Audit deleted successfully.' });
+        setToastMessage({ type: 'success', text: data.message || 'Audit and associated records deleted successfully.' });
         fetchAudits();
         setTimeout(() => setToastMessage(null), 4000);
       } else {
-        setDeleteError(data.error || 'Unable to delete the audit. Please try again.');
+        if (data.error === 'Audit not found') {
+          // If audit was already deleted from DB, clean it up from table immediately
+          const targetId = selectedAuditToDelete.id;
+          const targetStr = selectedAuditToDelete.auditIdString || '';
+          const baseStr = targetStr.replace(/-RA\d*$/, '');
+          setAudits(prev => prev.filter(a => a.id !== targetId && a.auditIdString !== targetStr && (a.auditIdString || '').replace(/-RA\d*$/, '') !== baseStr));
+          setSelectedAuditToDelete(null);
+          setToastMessage({ type: 'success', text: 'Audit record cleared.' });
+          setTimeout(() => setToastMessage(null), 4000);
+        } else {
+          setDeleteError(data.error || 'Unable to delete the audit. Please try again.');
+        }
       }
     } catch (err: any) {
       console.error('Delete audit error:', err);
@@ -109,7 +147,14 @@ export const AdminAudits: React.FC = () => {
     return <span className="db-badge"><span className="db-badge-dot bg-gray-500"></span> {status || 'Unknown'}</span>;
   };
 
-  const filtered = audits.filter(a => {
+  const auditTypeAudits = audits.filter(a => {
+    const isRe = a.auditType === 'Re-Audit' || a.auditType === 'Re Audit';
+    if (auditTypeFilter === 'Original') return !isRe;
+    const st = (a.status || '').toLowerCase();
+    return isRe && !(st === 'in progress' && (a.score === null || a.score === undefined));
+  });
+
+  const filtered = auditTypeAudits.filter(a => {
     const matchesSearch = (a.auditIdString || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (a.auditPeriod || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || (a.status || '').toLowerCase() === statusFilter.toLowerCase();
@@ -146,6 +191,21 @@ export const AdminAudits: React.FC = () => {
       {/* 2. Main Table Card */}
       <div className="db-card">
         <div className="table-toolbar">
+          {/* Audit Type Filter Dropdown at 1st Position */}
+          <div className="flex items-center gap-2">
+            <div className="filter-dropdown-wrapper">
+              <Filter className="filter-dropdown-icon" />
+              <select 
+                className="filter-dropdown-select font-bold"
+                value={auditTypeFilter}
+                onChange={e => setAuditTypeFilter(e.target.value as 'Original' | 'Re-Audit')}
+              >
+                <option value="Original">Audit Type: Original</option>
+                <option value="Re-Audit">Audit Type: Re Audit</option>
+              </select>
+            </div>
+          </div>
+
           <div className="search-input-wrapper">
             <Search className="search-input-icon" />
             <input 
@@ -165,7 +225,7 @@ export const AdminAudits: React.FC = () => {
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
               >
-                <option value="All">All Statuses ({audits.length})</option>
+                <option value="All">All Statuses ({auditTypeAudits.length})</option>
                 <option value="Scheduled">Scheduled</option>
                 <option value="In Progress">In Progress</option>
                 <option value="Pending Sign-off">Pending Sign-off</option>
@@ -173,7 +233,7 @@ export const AdminAudits: React.FC = () => {
               </select>
             </div>
             <span className="text-xs text-slate-500 font-semibold hidden md:inline">
-              Showing {filtered.length} of {audits.length}
+              Showing {filtered.length} of {auditTypeAudits.length}
             </span>
           </div>
         </div>
@@ -182,6 +242,31 @@ export const AdminAudits: React.FC = () => {
           <table className="enterprise-table">
             <thead>
               <tr>
+                <th style={{ width: '105px', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                    <span style={{ fontSize: '0.7rem', letterSpacing: '0.04em' }}>Audit Type</span>
+                    <select
+                      value={auditTypeFilter}
+                      onChange={e => setAuditTypeFilter(e.target.value as 'Original' | 'Re-Audit')}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        borderRadius: '5px',
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        outline: 'none'
+                      }}
+                      title="Toggle between Original and Re Audit"
+                    >
+                      <option value="Original">Original</option>
+                      <option value="Re-Audit">Re Audit</option>
+                    </select>
+                  </div>
+                </th>
                 <th>Audit ID</th>
                 <th>Period</th>
                 <th>Audit Timeline</th>
@@ -192,31 +277,93 @@ export const AdminAudits: React.FC = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-12"><Loader2 className="animate-spin w-6 h-6 mx-auto text-[#0B63E5]" /></td></tr>
+                <tr><td colSpan={7} className="text-center py-12"><Loader2 className="animate-spin w-6 h-6 mx-auto text-[#0B63E5]" /></td></tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <FileCheck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p className="text-xs font-semibold text-slate-500">No audits found matching current filter</p>
+                    <p className="text-xs font-semibold text-slate-500">No {auditTypeFilter === 'Original' ? 'original audits' : 're-audits'} found matching current filter</p>
                   </td>
                 </tr>
               ) : (
                 filtered.map(a => {
                   const is100Percent = a.completionPercentage === 100 || ['closed', 'completed', 'approved'].includes((a.status || '').toLowerCase());
+                  const isRe = a.auditType === 'Re-Audit' || a.auditType === 'Re Audit';
                   return (
                     <tr key={a.id}>
                       <td>
-                        <span className="audit-id-badge">{a.auditIdString}</span>
+                        {isRe ? (
+                          <span 
+                            className="db-badge" 
+                            style={{ 
+                              backgroundColor: '#F3E8FF', 
+                              color: '#7E22CE', 
+                              border: '1px solid #D8B4FE', 
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              fontSize: '0.725rem'
+                            }}
+                          >
+                            <span className="db-badge-dot" style={{ backgroundColor: '#9333EA' }}></span>
+                            Re Audit
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                            <span 
+                              className="db-badge" 
+                              style={{ 
+                                backgroundColor: '#ECFDF5', 
+                                color: '#047857', 
+                                border: '1px solid #A7F3D0', 
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '999px',
+                                fontSize: '0.725rem'
+                              }}
+                            >
+                              <span className="db-badge-dot" style={{ backgroundColor: '#10B981' }}></span>
+                              Original
+                            </span>
+                            {a.isReadOnly && (
+                              <span 
+                                className="db-badge" 
+                                style={{ 
+                                  backgroundColor: '#FEF3C7', 
+                                  color: '#92400E', 
+                                  border: '1px solid #FDE68A', 
+                                  fontSize: '0.65rem', 
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 700,
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="This original audit has been re-audited and is now read-only"
+                              >
+                                Read-Only
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className="audit-id-badge" style={{ whiteSpace: 'nowrap' }}>{a.auditIdString}</span>
                       </td>
                       <td className="font-semibold text-slate-800">{a.auditPeriod}</td>
                       <td className="text-xs font-medium text-slate-600">
-                        {new Date(a.startDate).toLocaleDateString()} - {new Date(a.dueDate).toLocaleDateString()}
+                        {formatDate(a.startDate)} - {formatDate(a.dueDate)}
                       </td>
                       <td>{getStatusBadge(a.status)}</td>
                       <td>
                         {a.score !== null ? (
-                          <span className={`score-badge-pill ${a.score >= 80 ? 'high' : a.score >= 50 ? 'medium' : 'low'}`}>
-                            {a.score}%
+                          <span className={`score-badge-pill ${a.score >= 80 ? 'high' : a.score >= 50 ? 'medium' : 'low'}`} style={{ whiteSpace: 'nowrap' }}>
+                            {typeof a.score === 'number' ? Math.round(a.score) : a.score}%
                           </span>
                         ) : (
                           <span className="text-slate-400 text-xs italic font-medium">N/A</span>

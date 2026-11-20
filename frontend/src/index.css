@@ -631,6 +631,241 @@ body {
   color: var(--color-text-muted);
 }
 
+/* Law Button near State number */
+.badge-law-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.175rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1565C0;
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.badge-law-btn:hover {
+  background-color: #DBEAFE;
+  border-color: #93C5FD;
+  color: #0D47A1;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.15);
+}
+
+.badge-law-btn.has-rule {
+  background-color: #F0FDF4;
+  border-color: #BBF7D0;
+  color: #166534;
+}
+
+.badge-law-btn.has-rule:hover {
+  background-color: #DCFCE7;
+  border-color: #86EFAC;
+  color: #14532D;
+}
+
+/* Law Description Modal */
+.law-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 1rem;
+  animation: lawFadeIn 0.2s ease-out;
+}
+
+.law-modal-container {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  max-width: 580px;
+  width: 100%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  animation: lawSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lawFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes lawSlideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.law-modal-header {
+  padding: 1.25rem 1.5rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.law-modal-icon-badge {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.625rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.law-modal-act-code {
+  font-size: 0.725rem;
+  font-weight: 800;
+  color: #1565c0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.law-modal-act-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.law-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.375rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.law-modal-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.law-modal-body {
+  padding: 1.5rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.law-category-pill {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.law-modal-content-card {
+  background: #fafcff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  padding: 1.125rem 1.25rem;
+}
+
+.law-content-heading {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.law-content-text {
+  font-size: 0.875rem;
+  color: #0f172a;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.law-content-empty {
+  color: #64748b;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.law-content-subtext {
+  display: block;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.375rem;
+}
+
+.law-modal-states {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.law-states-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.law-states-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.law-state-chip {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.law-modal-footer {
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.law-modal-done-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  background: #1565c0;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.law-modal-done-btn:hover {
+  background: #0d47a1;
+}
+
 .item-title {
   font-size: 0.9375rem;
   font-weight: 700;
@@ -1566,3 +1801,292 @@ body {
 .db-card-body {
   padding: 1.5rem;
 }
+
+/* ==========================================================================
+   Auditor Portal - Vendor Evidence Vault & Modal Styles
+   ========================================================================== */
+.evidence-vault-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1565C0;
+  background-color: #EFF6FF;
+  border: 1.5px solid #BFDBFE;
+  box-shadow: 0 1px 2px rgba(21, 101, 192, 0.08);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.evidence-vault-header-btn:hover {
+  background-color: #DBEAFE;
+  border-color: #93C5FD;
+  transform: translateY(-1px);
+}
+
+.evidence-vault-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0.45rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background-color: #1565C0;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.evidence-vault-banner {
+  margin-top: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.625rem;
+  border: 1.5px solid #BFDBFE;
+  background: linear-gradient(135deg, #F0F7FF 0%, #F8FAFC 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.05);
+}
+
+.evidence-vault-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.evidence-vault-icon-circle {
+  width: 2.375rem;
+  height: 2.375rem;
+  border-radius: 50%;
+  background-color: #DBEAFE;
+  border: 1px solid #BFDBFE;
+  color: #1565C0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.evidence-vault-banner-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #0B1F3A;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.15rem;
+}
+
+.evidence-vault-banner-sub {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin: 0;
+}
+
+.evidence-vault-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background-color: #EFF6FF;
+  color: #1565C0;
+  border: 1px solid #BFDBFE;
+}
+
+.evidence-vault-pill.active {
+  background-color: #ECFDF5;
+  color: #047857;
+  border-color: #A7F3D0;
+}
+
+.evidence-vault-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background-color: #1565C0;
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.2);
+  transition: all 0.15s ease;
+}
+
+.evidence-vault-btn-primary:hover {
+  background-color: #0D47A1;
+  box-shadow: 0 4px 6px rgba(21, 101, 192, 0.25);
+  transform: translateY(-1px);
+}
+
+.evidence-vault-btn-primary:disabled {
+  background-color: #CBD5E1;
+  color: #94A3B8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.evidence-vault-inline-list {
+  margin-top: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.evidence-vault-inline-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.875rem;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.5rem;
+  gap: 0.75rem;
+  transition: all 0.15s ease;
+}
+
+.evidence-vault-inline-item:hover {
+  border-color: #93C5FD;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.evidence-vault-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.evidence-btn-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: #1565C0;
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.evidence-btn-view:hover {
+  background-color: #0D47A1;
+}
+
+.evidence-btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: #F1F5F9;
+  color: #334155;
+  border: 1px solid #CBD5E1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.evidence-btn-download:hover {
+  background-color: #E2E8F0;
+  color: #0F172A;
+}
+
+/* Modal Overlay & Card */
+.evidence-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  background-color: rgba(11, 31, 58, 0.65);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.evidence-modal-card {
+  background-color: #FFFFFF;
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 820px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(11, 31, 58, 0.35);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  animation: scaleUp 0.18s ease-out;
+}
+
+.evidence-modal-header {
+  padding: 1.125rem 1.5rem;
+  background-color: #0B1F3A;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.evidence-modal-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #CBD5E1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.evidence-modal-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+
+.evidence-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  background-color: #F8FAFC;
+}
+
+.evidence-modal-footer {
+  padding: 1rem 1.5rem;
+  background-color: #FFFFFF;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+

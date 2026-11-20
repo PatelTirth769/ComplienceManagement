@@ -1,5 +1,6 @@
 const PptxGenJS = require('pptxgenjs');
 const excelReportService = require('./excelReportService');
+const { formatDate, formatDateTime } = require('../utils/dateUtils');
 
 /**
  * Helper to safely extract string values for PPT text & tables,
@@ -169,8 +170,8 @@ exports.generateAuditPptBuffer = async (auditData) => {
     [{ text: 'Assigned Auditor' }, { text: auditorName }],
     [{ text: 'Establishment Type' }, { text: establishmentType }],
     [{ text: 'Audit Period' }, { text: auditPeriod }],
-    [{ text: 'Start Date' }, { text: safeStr(auditData.startDate) }],
-    [{ text: 'Due / Completion Date' }, { text: safeStr(auditData.dueDate) }],
+    [{ text: 'Start Date' }, { text: safeStr(formatDate(auditData.startDate)) }],
+    [{ text: 'Due / Completion Date' }, { text: safeStr(formatDate(auditData.dueDate)) }],
     [{ text: 'Audit Status' }, { text: status }]
   ];
   slide3.addTable(infoTableRows, { ...tableProps, y: 1.1, colW: [3.5, 5.5], fontSize: 9 });
@@ -357,15 +358,7 @@ exports.generateAuditPptBuffer = async (auditData) => {
     timelineEvents.slice(0, 7).forEach(te => {
       if (te && typeof te === 'object') {
         const evName = te.event || te.title || 'Audit Event';
-        let dateStr = 'N/A';
-        if (te.timestamp) {
-          try {
-            const d = new Date(te.timestamp);
-            dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString() : String(te.timestamp);
-          } catch (e) {
-            dateStr = String(te.timestamp);
-          }
-        }
+        let dateStr = formatDate(te.timestamp);
         const actorStr = te.actor || 'System';
         const notesStr = te.notes || te.description || 'Activity logged';
         tRows.push([

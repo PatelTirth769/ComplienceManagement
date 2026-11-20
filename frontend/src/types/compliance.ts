@@ -57,6 +57,12 @@ export interface ComplianceResponse {
   itemId: string;
   status: ComplianceStatus;
   remarks: string;
+  title?: string;
+  particulars?: string;
+  type?: string;
+  actNameInShort?: string;
+  nameOfAct?: string;
+  category?: string;
 }
 
 export interface AuditInformation {
@@ -115,6 +121,31 @@ export interface CalculationResult {
   nonCompliantItems: NonCompliantItemDetail[];
 }
 
+export interface QuestionAnswerItem {
+  id: string;
+  question: string;
+  answer?: string;
+  attachmentName?: string;
+  attachmentData?: string;
+  attachmentType?: string;
+  attachmentSize?: number;
+}
+
+export interface InterviewResource {
+  id: string;
+  name: string;
+  preDate: string;
+  finalDate: string;
+  ask: string;
+  status: string;
+  question?: string;
+  answer?: string;
+  questions?: QuestionAnswerItem[];
+  loginId?: string;
+  pass?: string;
+  isQuestionSaved?: boolean;
+}
+
 export interface AuditRecord extends AuditInformation {
   id: string;
   auditIdString?: string;
@@ -122,6 +153,8 @@ export interface AuditRecord extends AuditInformation {
   categoryScores: CategoryScore[];
   nonCompliantItems: NonCompliantItemDetail[];
   responses: ComplianceResponse[];
+  interviewAudit?: boolean;
+  interviewResources?: InterviewResource[];
   createdAt: string;
   updatedAt: string;
 }

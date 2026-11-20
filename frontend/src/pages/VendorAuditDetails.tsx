@@ -5,14 +5,17 @@ import {
   LayoutDashboard, User, FileCheck, FolderOpen, 
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, 
   ArrowLeft, CheckCircle2, Calendar, Building2, UserCheck, 
-  Hash, Shield, ChevronRight, Info
+  Hash, Shield, ChevronRight, Info, Scale, X
 } from 'lucide-react';
 import { getVendorAuditById } from '../services/api';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
+import { findActRule, getDisplayLaw } from '../utils/actLawMatcher';
 
 export const VendorAuditDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [isLoading, setIsLoading] = useState(true);
   const [audit, setAudit] = useState<any>(null);
+  const [activeLawModal, setActiveLawModal] = useState<{ item: any; law: any } | null>(null);
 
   const sidebarItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/vendor' },
@@ -93,6 +96,12 @@ export const VendorAuditDetails: React.FC = () => {
     }
     if (s === 'scheduled') return 15;
     return 0;
+  };
+
+  const actRules: any[] = audit?.actRules || [];
+
+  const getActLaw = (catOrItem: any) => {
+    return findActRule(catOrItem, actRules);
   };
 
   if (isLoading) {
@@ -178,6 +187,37 @@ export const VendorAuditDetails: React.FC = () => {
               <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                 {audit.auditIdString || `#${(audit.id || '').slice(-8)}`}
               </span>
+              <span 
+                style={{
+                  backgroundColor: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#F3E8FF' : 'rgba(255,255,255,0.15)',
+                  color: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#7E22CE' : '#FFFFFF',
+                  border: `1px solid ${audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#D8B4FE' : 'rgba(255,255,255,0.25)'}`,
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  padding: '0.3rem 0.75rem',
+                  borderRadius: '999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                {audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? 'Re-Audit' : 'Original Audit'}
+              </span>
+              {audit.isReadOnly && (
+                <span 
+                  style={{
+                    backgroundColor: '#FEF3C7',
+                    color: '#92400E',
+                    border: '1px solid #FDE68A',
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    padding: '0.3rem 0.75rem',
+                    borderRadius: '999px'
+                  }}
+                >
+                  Read-Only
+                </span>
+              )}
             </div>
             <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'white', margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>
               Audit Details: {audit.auditPeriod}
@@ -189,7 +229,7 @@ export const VendorAuditDetails: React.FC = () => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255,255,255,0.65)', fontSize: '0.875rem' }}>
                 <Calendar style={{ width: '14px', height: '14px' }} />
-                {audit.startDate} → {audit.dueDate}
+                {formatDate(audit.startDate)} → {formatDate(audit.dueDate)}
               </div>
             </div>
           </div>
@@ -251,8 +291,8 @@ export const VendorAuditDetails: React.FC = () => {
                 { label: 'Auditor Assigned', value: audit.auditorName || audit.auditor || 'N/A', icon: Shield, color: '#7C3AED', bg: '#F5F3FF' },
                 { label: 'Establishment Type', value: audit.establishmentType || 'N/A', icon: Building2, color: '#0891B2', bg: '#ECFEFF' },
                 { label: 'Audit Period', value: audit.auditPeriod, icon: Clock, color: '#D97706', bg: '#FFFBEB' },
-                { label: 'Start Date', value: audit.startDate || 'N/A', icon: Calendar, color: '#059669', bg: '#ECFDF5' },
-                { label: 'Due Date', value: audit.dueDate || 'N/A', icon: Calendar, color: '#DC2626', bg: '#FEF2F2' },
+                { label: 'Start Date', value: formatDate(audit.startDate) || 'N/A', icon: Calendar, color: '#059669', bg: '#ECFDF5' },
+                { label: 'Due Date', value: formatDate(audit.dueDate) || 'N/A', icon: Calendar, color: '#DC2626', bg: '#FEF2F2' },
               ].map((item, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem', padding: '0.875rem 1rem', background: '#FAFCFF', borderRadius: '10px', border: '1px solid #F1F5F9' }}>
                   <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -399,19 +439,41 @@ export const VendorAuditDetails: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(audit.categoryScores || audit.labourCodes || audit.sections).map((cat: any, i: number) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: i % 2 === 0 ? '#FFFFFF' : '#FAFCFF' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0B1F3A' }}>{cat.category || cat.section || cat.labourCode || 'General'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748B' }}>{cat.totalItems ?? 'N/A'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#1565C0', fontWeight: 600 }}>{cat.applicableItems ?? 'N/A'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#059669', fontWeight: 600 }}>{cat.compliantItems ?? 'N/A'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: cat.nonCompliantItems > 0 ? '#DC2626' : '#64748B', fontWeight: cat.nonCompliantItems > 0 ? 700 : 400 }}>{cat.nonCompliantItems ?? 'N/A'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#D97706' }}>{cat.naItems ?? 'N/A'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: cat.score != null ? (cat.score >= 85 ? '#059669' : cat.score >= 70 ? '#D97706' : '#DC2626') : '#94A3B8' }}>
-                          {cat.scoreDisplay ?? (cat.score != null ? `${Math.round(cat.score)}%` : 'N/A')}
-                        </td>
-                      </tr>
-                    ))}
+                    {(audit.categoryScores || audit.labourCodes || audit.sections).map((cat: any, i: number) => {
+                      const catName = cat.category || cat.section || cat.labourCode || 'General';
+                      const matchedLaw = getActLaw(cat);
+                      const lawDescription = (matchedLaw?.description || '').trim();
+
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: i % 2 === 0 ? '#FFFFFF' : '#FAFCFF' }}>
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0B1F3A', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                              <span>{catName}</span>
+                              <button
+                                type="button"
+                                className={`badge-law-btn ${lawDescription ? 'has-rule' : ''} no-print`}
+                                onClick={() => {
+                                  const lawToDisplay = getDisplayLaw(cat, matchedLaw);
+                                  setActiveLawModal({ item: cat, law: lawToDisplay });
+                                }}
+                                title={`View Law & Statutory Rule for ${matchedLaw?.shortName || catName}`}
+                              >
+                                <Scale className="w-3 h-3 mr-1 inline-block" />
+                                <span>Law</span>
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748B' }}>{cat.totalItems ?? 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#1565C0', fontWeight: 600 }}>{cat.applicableItems ?? 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#059669', fontWeight: 600 }}>{cat.compliantItems ?? 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: cat.nonCompliantItems > 0 ? '#DC2626' : '#64748B', fontWeight: cat.nonCompliantItems > 0 ? 700 : 400 }}>{cat.nonCompliantItems ?? 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#D97706' }}>{cat.naItems ?? 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: cat.score != null ? (cat.score >= 85 ? '#059669' : cat.score >= 70 ? '#D97706' : '#DC2626') : '#94A3B8' }}>
+                            {cat.scoreDisplay ?? (cat.score != null ? `${Math.round(cat.score)}%` : 'N/A')}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -444,7 +506,7 @@ export const VendorAuditDetails: React.FC = () => {
                       }} />
                       <p style={{ fontWeight: 700, color: '#0B1F3A', fontSize: '0.875rem', margin: '0 0 0.25rem' }}>{event.event}</p>
                       <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: '0 0 0.25rem' }}>
-                        {new Date(event.timestamp).toLocaleString()} {event.actor ? `• ${event.actor}` : ''}
+                        {formatDateTime(event.timestamp)} {event.actor ? `• ${event.actor}` : ''}
                       </p>
                       {event.notes && <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '0.25rem 0 0', background: '#F8FAFC', padding: '0.5rem 0.75rem', borderRadius: '6px', borderLeft: '2px solid #BFDBFE' }}>{event.notes}</p>}
                     </div>
@@ -510,6 +572,74 @@ export const VendorAuditDetails: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Statutory Law Modal for this Act */}
+      {activeLawModal && (
+        <div className="law-modal-overlay" onClick={() => setActiveLawModal(null)}>
+          <div className="law-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="law-modal-header">
+              <div className="flex items-center gap-2.5">
+                <div className="law-modal-icon-badge">
+                  <Scale className="w-5 h-5 text-[#1565C0]" />
+                </div>
+                <div>
+                  <div className="law-modal-act-code">{activeLawModal.law?.shortName || activeLawModal.item?.category || 'Statutory Act'}</div>
+                  <h3 className="law-modal-act-title">{activeLawModal.law?.actName || activeLawModal.item?.category || 'Statutory Act Law'}</h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="law-modal-close-btn"
+                onClick={() => setActiveLawModal(null)}
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="law-modal-body">
+              {activeLawModal.law?.category && (
+                <div className="law-modal-category">
+                  <span className="law-category-pill">{activeLawModal.law.category}</span>
+                </div>
+              )}
+
+              <div className="law-modal-content-card">
+                <div className="law-content-heading">Statutory Rule / Law Mandate:</div>
+                {activeLawModal.law?.description?.trim() ? (
+                  <div className="law-content-text">{activeLawModal.law.description.trim()}</div>
+                ) : (
+                  <div className="law-content-empty">
+                    <p>No statutory law description was configured for this Act during this audit.</p>
+                    <span className="law-content-subtext">Admin can write and save rules in Admin Console &gt; Rules for future audits.</span>
+                  </div>
+                )}
+              </div>
+
+              {activeLawModal.law?.states && activeLawModal.law.states.length > 0 && (
+                <div className="law-modal-states">
+                  <span className="law-states-title">Applicable Jurisdiction:</span>
+                  <div className="law-states-tags">
+                    {activeLawModal.law.states.map((st: string, i: number) => (
+                      <span key={i} className="law-state-chip">{st}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="law-modal-footer">
+              <button
+                type="button"
+                className="law-modal-done-btn"
+                onClick={() => setActiveLawModal(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

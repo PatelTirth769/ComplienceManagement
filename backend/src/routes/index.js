@@ -29,5 +29,15 @@ router.use('/customer', customerRoutes);
 // Auditor Routes Alias
 router.get('/auditor/audits/:id/download-excel', complianceController.downloadAuditExcelById);
 router.post('/auditor/download-excel', complianceController.downloadExcel);
+router.get('/auditor/audits/:auditId/documents', complianceController.getAuditDocuments);
+router.get('/auditor/documents/:docId/url', complianceController.getDocumentDownloadUrl);
+
+// Interview Portal Direct & Alias Routes
+router.post('/interview/login', complianceController.interviewLogin);
+router.post('/interview-login', complianceController.interviewLogin);
+router.post('/interview/answer', complianceController.submitInterviewAnswer);
+router.post('/interview-answer', complianceController.submitInterviewAnswer);
+router.get('/interview/session', complianceController.getInterviewSession);
+router.get('/interview-session', complianceController.getInterviewSession);
 
 module.exports = router;

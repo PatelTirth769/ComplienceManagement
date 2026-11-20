@@ -4,10 +4,11 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   LayoutDashboard, Building2, FileCheck, Clock, 
   BarChart3, Bell, Search, Filter, Eye, Download,
-  AlertCircle, Shield, FileText, CheckCircle2, AlertTriangle, X, Presentation, FileBarChart
+  AlertCircle, Shield, FileText, CheckCircle2, AlertTriangle, X, Presentation, FileBarChart, Scale
 } from 'lucide-react';
 import { getCustomerReports } from '../services/api';
 import api from '../services/api';
+import { findActRule, getDisplayLaw } from '../utils/actLawMatcher';
 
 export const CustomerReports: React.FC = () => {
   const navigate = useNavigate();
@@ -21,9 +22,10 @@ export const CustomerReports: React.FC = () => {
     pendingReports: 0
   });
 
-  // Selected report for modal view
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
+  const [activeLawModal, setActiveLawModal] = useState<{ item: any; law: any } | null>(null);
+  const [fallbackActRules, setFallbackActRules] = useState<any[]>([]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +43,11 @@ export const CustomerReports: React.FC = () => {
     { name: 'Overall PPT', icon: Presentation, path: '/customer/overall-ppt' },
     { name: 'Overall Report', icon: FileBarChart, path: '/customer/overall-report' }
   ];
+
+  const getActLaw = (catOrItem: any, reportObj: any) => {
+    const actRules: any[] = (reportObj?.actRules && reportObj.actRules.length > 0) ? reportObj.actRules : fallbackActRules;
+    return findActRule(catOrItem, actRules);
+  };
 
   const fetchReports = async () => {
     try {
@@ -65,6 +72,11 @@ export const CustomerReports: React.FC = () => {
 
   useEffect(() => {
     fetchReports();
+    api.get('/compliance/rules').then(res => {
+      if (res.data && Array.isArray(res.data.rules)) {
+        setFallbackActRules(res.data.rules);
+      }
+    }).catch(console.warn);
   }, []);
 
   const handleDownloadExcel = async (reportItem: any, e?: React.MouseEvent) => {
@@ -524,14 +536,33 @@ export const CustomerReports: React.FC = () => {
                     Category / Labour Code Breakdown
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                    {selectedReport.categoryScores.map((cs: any, idx: number) => (
-                      <div key={idx} style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0B1F3A' }}>{cs.category}</span>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: cs.score >= 80 ? '#047857' : (cs.score >= 50 ? '#B45309' : '#DC2626') }}>
-                          {cs.score != null ? `${Math.round(cs.score)}%` : 'N/A'}
-                        </span>
-                      </div>
-                    ))}
+                    {selectedReport.categoryScores.map((cs: any, idx: number) => {
+                      const matchedLaw = getActLaw(cs, selectedReport);
+                      const lawDescription = (matchedLaw?.description || '').trim();
+
+                      return (
+                        <div key={idx} style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0B1F3A' }}>{cs.category}</span>
+                            <button
+                              type="button"
+                              className={`badge-law-btn ${lawDescription ? 'has-rule' : ''} no-print`}
+                              onClick={() => {
+                                const lawToDisplay = getDisplayLaw(cs, matchedLaw);
+                                setActiveLawModal({ item: cs, law: lawToDisplay });
+                              }}
+                              title={`View Law & Statutory Rule for ${matchedLaw?.shortName || cs.category}`}
+                            >
+                              <Scale className="w-3 h-3 mr-1 inline-block" />
+                              <span>Law</span>
+                            </button>
+                          </div>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: cs.score >= 80 ? '#047857' : (cs.score >= 50 ? '#B45309' : '#DC2626') }}>
+                            {cs.score != null ? `${Math.round(cs.score)}%` : 'N/A'}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -596,6 +627,74 @@ export const CustomerReports: React.FC = () => {
                   {isDownloading === selectedReport.id ? 'Exporting...' : 'Download Full Excel Report'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Statutory Law Modal for this Act */}
+      {activeLawModal && (
+        <div className="law-modal-overlay" onClick={() => setActiveLawModal(null)}>
+          <div className="law-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="law-modal-header">
+              <div className="flex items-center gap-2.5">
+                <div className="law-modal-icon-badge">
+                  <Scale className="w-5 h-5 text-[#1565C0]" />
+                </div>
+                <div>
+                  <div className="law-modal-act-code">{activeLawModal.law?.shortName || activeLawModal.item?.category || 'Statutory Act'}</div>
+                  <h3 className="law-modal-act-title">{activeLawModal.law?.actName || activeLawModal.item?.category || 'Statutory Act Law'}</h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="law-modal-close-btn"
+                onClick={() => setActiveLawModal(null)}
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="law-modal-body">
+              {activeLawModal.law?.category && (
+                <div className="law-modal-category">
+                  <span className="law-category-pill">{activeLawModal.law.category}</span>
+                </div>
+              )}
+
+              <div className="law-modal-content-card">
+                <div className="law-content-heading">Statutory Rule / Law Mandate:</div>
+                {activeLawModal.law?.description?.trim() ? (
+                  <div className="law-content-text">{activeLawModal.law.description.trim()}</div>
+                ) : (
+                  <div className="law-content-empty">
+                    <p>No statutory law description was configured for this Act during this audit.</p>
+                    <span className="law-content-subtext">Admin can write and save rules in Admin Console &gt; Rules for future audits.</span>
+                  </div>
+                )}
+              </div>
+
+              {activeLawModal.law?.states && activeLawModal.law.states.length > 0 && (
+                <div className="law-modal-states">
+                  <span className="law-states-title">Applicable Jurisdiction:</span>
+                  <div className="law-states-tags">
+                    {activeLawModal.law.states.map((st: string, i: number) => (
+                      <span key={i} className="law-state-chip">{st}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="law-modal-footer">
+              <button
+                type="button"
+                className="law-modal-done-btn"
+                onClick={() => setActiveLawModal(null)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Download, FileText, CheckCircle2, ShieldCheck, FileSpreadsheet
 } from 'lucide-react';
 import { getVendorReports, downloadVendorReport, API_BASE_URL } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 
 export const VendorReports: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -196,7 +197,7 @@ export const VendorReports: React.FC = () => {
                         </div>
                       </td>
                       <td style={{ padding: '1.25rem 1.5rem', color: '#64748B' }}>
-                        {completionDate ? new Date(completionDate).toLocaleDateString() : '10/6/2026'}
+                        {formatDate(completionDate, '06/10/2026')}
                       </td>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                         <span style={{

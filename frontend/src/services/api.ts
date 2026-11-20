@@ -88,6 +88,14 @@ export async function saveAudit(payload: any): Promise<{ success: boolean; data:
 }
 
 /**
+ * Initiate Re-Audit for an audit (marks original as Read-Only and clones into a new Re-Audit)
+ */
+export async function initiateReAudit(auditId: string): Promise<{ success: boolean; message: string; data: any; originalAuditId: string }> {
+  const response = await api.post<{ success: boolean; message: string; data: any; originalAuditId: string }>(`/compliance/audits/${auditId}/re-audit`);
+  return response.data;
+}
+
+/**
  * Get audit record by ID
  */
 export async function getAudit(id: string): Promise<AuditRecord> {
@@ -98,6 +106,27 @@ export async function getAudit(id: string): Promise<AuditRecord> {
 export async function getAssignedAudits(): Promise<any[]> {
   const response = await api.get<{ success: boolean; data: any[] }>('/compliance/assigned-audits');
   return response.data.data;
+}
+
+/**
+ * Fetch documents uploaded for an audit (accessible by Auditor & Admin)
+ */
+export async function getAuditDocuments(auditId: string): Promise<any[]> {
+  try {
+    const response = await api.get<{ success: boolean; data: any[] }>(`/compliance/audits/${auditId}/documents`);
+    return response.data.data || [];
+  } catch (error) {
+    console.warn('Failed to load audit documents:', error);
+    return [];
+  }
+}
+
+/**
+ * Get pre-signed download / view URL for a document (accessible by Auditor & Admin)
+ */
+export async function getAuditDocumentUrl(docId: string): Promise<any> {
+  const response = await api.get(`/compliance/documents/${docId}/url`);
+  return response.data;
 }
 
 /**
@@ -238,6 +267,64 @@ export async function getCustomerAuditById(id: string): Promise<any> {
   return response.data;
 }
 
+export async function updateAuditorDocumentAccess(auditId: string, allow: boolean): Promise<any> {
+  const response = await api.patch(`/customer/audits/${auditId}/auditor-document-access`, {
+    allowAuditorToSeeDocuments: allow
+  });
+  return response.data;
+}
+
+export async function updateInterviewAuditAccess(auditId: string, allow: boolean): Promise<any> {
+  const response = await api.patch(`/customer/audits/${auditId}/interview-audit`, {
+    interviewAudit: allow,
+    allow: allow
+  });
+  return response.data;
+}
+
+export async function saveInterviewResources(auditId: string, resources: any[], auditorEmail?: string, sendEmail?: boolean): Promise<any> {
+  const response = await api.patch(`/compliance/audits/${auditId}/interview-resources`, {
+    resources,
+    auditorEmail,
+    sendEmail: sendEmail === true
+  });
+  return response.data;
+}
+
+export async function interviewLogin(loginId: string, pass: string, auditId?: string): Promise<any> {
+  const response = await api.post('/compliance/interview-login', { loginId, pass, auditId });
+  return response.data;
+}
+
+export async function submitInterviewAnswer(
+  auditId: string, 
+  resourceId: string, 
+  answer?: string, 
+  answers?: Record<string, string>, 
+  questions?: any[]
+): Promise<any> {
+  const response = await api.post('/compliance/interview-answer', { 
+    auditId, 
+    resourceId, 
+    answer, 
+    answers, 
+    questions 
+  });
+  return response.data;
+}
+
+export async function getInterviewSession(auditId: string, resourceId: string): Promise<any> {
+  const response = await api.get('/compliance/interview-session', {
+    params: { auditId, resourceId }
+  });
+  return response.data;
+}
+
+export async function getAdminAudits(): Promise<{ success: boolean; audits: any[] }> {
+  const response = await api.get<{ success: boolean; audits: any[] }>('/admin/audits');
+  return response.data;
+}
+
 export async function getCustomerTimeline(): Promise<any> {
   const response = await api.get('/customer/timeline');
   return response.data;
@@ -277,6 +364,33 @@ export async function downloadCustomerAuditPpt(auditId: string): Promise<Blob> {
 
 export async function getCustomerOverallReport(): Promise<any> {
   const response = await api.get('/customer/overall-report');
+  return response.data;
+}
+
+export interface ActRule {
+  id: string;
+  actName: string;
+  shortName: string;
+  category: string;
+  states: string[];
+  formsCount?: number;
+  description: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export async function getActRules(): Promise<{ success: boolean; rules: ActRule[] }> {
+  const response = await api.get<{ success: boolean; rules: ActRule[] }>('/admin/rules');
+  return response.data;
+}
+
+export async function saveActRules(rules: ActRule[]): Promise<{ success: boolean; message: string; rules: ActRule[] }> {
+  const response = await api.post<{ success: boolean; message: string; rules: ActRule[] }>('/admin/rules', { rules });
+  return response.data;
+}
+
+export async function saveActRuleById(id: string, description: string): Promise<{ success: boolean; message: string; rule: ActRule }> {
+  const response = await api.put<{ success: boolean; message: string; rule: ActRule }>(`/admin/rules/${id}`, { description });
   return response.data;
 }
 

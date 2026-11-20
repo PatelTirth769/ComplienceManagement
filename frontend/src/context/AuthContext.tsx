@@ -22,7 +22,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('auth_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.role) {
+          const normRole = (parsed.role.charAt(0).toUpperCase() + parsed.role.slice(1).toLowerCase()) as User['role'];
+          return { ...parsed, role: normRole };
+        }
+      } catch (e) {
+        console.warn('Failed to parse auth_user:', e);
+      }
+    }
+
+    // Fallback: If auth_token exists, reconstruct user from JWT payload
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          if (payload && payload.role) {
+            const normRole = (payload.role.charAt(0).toUpperCase() + payload.role.slice(1).toLowerCase()) as User['role'];
+            const reconstructed: User = {
+              id: payload.id || 'admin-user',
+              name: payload.name || payload.email || 'Admin',
+              email: payload.email,
+              role: normRole
+            };
+            localStorage.setItem('auth_user', JSON.stringify(reconstructed));
+            return reconstructed;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not reconstruct user from auth_token:', err);
+      }
+    }
+    return null;
   });
 
   const login = async (email: string, password: string, role: User['role']) => {

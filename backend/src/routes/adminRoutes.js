@@ -33,4 +33,12 @@ router.patch('/checklist/:id/status', adminController.updateChecklistItem);
 // Analytics
 router.get('/analytics', adminController.getAnalytics);
 
+// Act Rules Management
+router.get('/rules', adminController.getActRules);
+router.post('/rules', adminController.saveActRules);
+router.put('/rules/:id', adminController.saveActRuleById);
+
+// Automated Reminders
+router.post('/reminders/check-now', adminController.triggerDocumentReminders);
+
 module.exports = router;

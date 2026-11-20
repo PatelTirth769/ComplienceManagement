@@ -3,6 +3,18 @@ const fs = require('fs');
 
 const OTHER_VENDOR = 'OTHER_VENDOR';
 const SECURITY_VENDOR = 'SECURITY_VENDOR';
+const STATE_VENDOR = 'STATE_VENDOR';
+
+const SUPPORTED_STATES = [
+  'All',
+  'N/A',
+  'Maharashtra',
+  'Haryana',
+  'Telangana',
+  'Karnataka',
+  'Madhya Pradesh',
+  'Uttar Pradesh'
+];
 
 const VENDOR_TYPES = [
   {
@@ -22,55 +34,39 @@ const VENDOR_TYPES = [
 // Load JSON data files
 const otherVendorChecklistPath = path.join(__dirname, '../data/otherVendorChecklist.json');
 const securityVendorChecklistPath = path.join(__dirname, '../data/securityVendorChecklist.json');
+const stateVendorChecklistPath = path.join(__dirname, '../data/stateVendorChecklist.json');
 
-// Helper function to safely load JSON data without crashing on empty or corrupt files
-function loadJsonSafely(filePath) {
-  try {
-    if (fs.existsSync(filePath)) {
-      const raw = fs.readFileSync(filePath, 'utf-8').trim();
-      if (raw.length > 0) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
+let otherVendorChecklist = [];
+let securityVendorChecklist = [];
+let stateVendorChecklist = [];
+
+function reloadChecklistsFromDisk() {
+  if (fs.existsSync(otherVendorChecklistPath)) {
+    try {
+      otherVendorChecklist = JSON.parse(fs.readFileSync(otherVendorChecklistPath, 'utf-8'));
+    } catch (e) {
+      console.warn('Error reading otherVendorChecklist.json:', e.message);
     }
-  } catch (err) {
-    console.warn(`[Checklist Warning]: Could not parse JSON from ${filePath}:`, err.message);
   }
-  return null;
-}
 
-let otherVendorChecklist = loadJsonSafely(otherVendorChecklistPath) || [];
-let securityVendorChecklist = loadJsonSafely(securityVendorChecklistPath) || [];
-
-// Fallback: If either checklist is empty, try to extract from reference Excel files
-if (otherVendorChecklist.length === 0 || securityVendorChecklist.length === 0) {
-  try {
-    const { extractChecklistFromExcel } = require('./excelService');
-    const referenceDir = path.resolve(__dirname, '../../../reference_files');
-
-    if (otherVendorChecklist.length === 0) {
-      const otherExcelPath = path.join(referenceDir, 'Other_Vendor_Audit__Checklist.xls');
-      if (fs.existsSync(otherExcelPath)) {
-        otherVendorChecklist = extractChecklistFromExcel(otherExcelPath, 'OTHER');
-        fs.mkdirSync(path.dirname(otherVendorChecklistPath), { recursive: true });
-        fs.writeFileSync(otherVendorChecklistPath, JSON.stringify(otherVendorChecklist, null, 2), 'utf-8');
-      }
+  if (fs.existsSync(securityVendorChecklistPath)) {
+    try {
+      securityVendorChecklist = JSON.parse(fs.readFileSync(securityVendorChecklistPath, 'utf-8'));
+    } catch (e) {
+      console.warn('Error reading securityVendorChecklist.json:', e.message);
     }
+  }
 
-    if (securityVendorChecklist.length === 0) {
-      const securityExcelPath = path.join(referenceDir, 'Security_Vendor_Audit_Checklist.xls');
-      if (fs.existsSync(securityExcelPath)) {
-        securityVendorChecklist = extractChecklistFromExcel(securityExcelPath, 'SECURITY');
-        fs.mkdirSync(path.dirname(securityVendorChecklistPath), { recursive: true });
-        fs.writeFileSync(securityVendorChecklistPath, JSON.stringify(securityVendorChecklist, null, 2), 'utf-8');
-      }
+  if (fs.existsSync(stateVendorChecklistPath)) {
+    try {
+      stateVendorChecklist = JSON.parse(fs.readFileSync(stateVendorChecklistPath, 'utf-8'));
+    } catch (e) {
+      console.warn('Error reading stateVendorChecklist.json:', e.message);
     }
-  } catch (err) {
-    console.warn('[Checklist Warning]: Could not auto-extract from Excel files:', err.message);
   }
 }
+
+reloadChecklistsFromDisk();
 
 /**
  * Normalizes vendor type parameter into canonical vendor code.
@@ -82,6 +78,7 @@ function normalizeVendorType(vendorType) {
   const normalized = vendorType.trim().toLowerCase().replace(/_/g, '-');
   if (normalized === 'other-vendor' || normalized === 'other') return OTHER_VENDOR;
   if (normalized === 'security-vendor' || normalized === 'security') return SECURITY_VENDOR;
+  if (normalized === 'state-vendor' || normalized === 'state') return STATE_VENDOR;
   return null;
 }
 
@@ -103,12 +100,94 @@ function getVendorTypes() {
 }
 
 /**
- * Returns checklist items for given vendor type.
+ * Combines checklist entries across multiple states and deduplicates
+ * identical statutory requirements while preserving which states they apply to.
+ * @param {Array<Object>} items 
+ * @returns {Array<Object>}
+ */
+function combineAndDeduplicateChecklist(items) {
+  if (!Array.isArray(items)) return [];
+  const groups = new Map();
+
+  items.forEach(item => {
+    const shortAct = (item.actNameInShort || item['Act Name in Short'] || item.type || '').trim().toLowerCase();
+    const formNo = (item.formNo || item['Form No.'] || '').trim().toLowerCase();
+    const desc = (item.description || item['Description'] || item.particulars || '').trim().toLowerCase();
+    const period = (item.periodicity || item['Periodicity'] || '').trim().toLowerCase();
+    const key = `${shortAct}:::${formNo}:::${desc}:::${period}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(item);
+  });
+
+  const consolidated = [];
+  groups.forEach((groupItems) => {
+    const first = groupItems[0];
+    const states = Array.from(new Set(groupItems.map(g => g.state || g.State).filter(Boolean)));
+
+    consolidated.push({
+      ...first,
+      applicableStates: states,
+      state: states.length > 1 ? `All (${states.length} States)` : (states[0] || 'N/A'),
+      isConsolidated: states.length > 1,
+      duplicateCount: groupItems.length
+    });
+  });
+
+  return consolidated;
+}
+
+/**
+ * Returns state-specific vendor compliance checklist.
+ * @param {Object} options - { state, country, deduplicate }
+ * @returns {Array<Object>}
+ */
+function getStateVendorChecklist(options = {}) {
+  const { state, deduplicate = true } = options;
+
+  if (!state || state.toLowerCase() === 'all') {
+    // "All": display the combined applicable entries across the six states, handling duplicates appropriately
+    return deduplicate ? combineAndDeduplicateChecklist(stateVendorChecklist) : stateVendorChecklist;
+  }
+
+  const normalizedState = state.trim().toLowerCase();
+
+  if (normalizedState === 'n/a' || normalizedState === 'na') {
+    // Keep N/A distinct from All. N/A represents unassigned/non-applicable state entries only, NOT a wildcard.
+    return stateVendorChecklist.filter(item => {
+      const itemState = (item.state || item.State || '').trim().toLowerCase();
+      return itemState === 'n/a' || itemState === 'na' || itemState === '';
+    });
+  }
+
+  // Filter for specific state
+  return stateVendorChecklist.filter(item => {
+    const itemState = (item.state || item.State || '').trim().toLowerCase();
+    return itemState === normalizedState;
+  });
+}
+
+/**
+ * Returns checklist items for given vendor type and state.
  * @param {string} vendorType 
+ * @param {Object} [options] - Optional filters like { state, country, deduplicate }
  * @returns {Array<Object>|null}
  */
-function getChecklistByVendorType(vendorType) {
+function getChecklistByVendorType(vendorType, options = {}) {
   const normalized = normalizeVendorType(vendorType);
+
+  if (normalized === STATE_VENDOR) {
+    return getStateVendorChecklist(options);
+  }
+
+  // If a state is specified for other-vendor or security-vendor:
+  if (options && options.state && options.state !== 'All' && options.state !== 'N/A') {
+    // State-specific checklist requested
+    return getStateVendorChecklist(options);
+  }
+
   if (normalized === OTHER_VENDOR) {
     return otherVendorChecklist;
   }
@@ -118,39 +197,68 @@ function getChecklistByVendorType(vendorType) {
   return null;
 }
 
-function getAllChecklists() {
+function getAllChecklists(options = {}) {
   return {
     otherVendor: otherVendorChecklist,
-    securityVendor: securityVendorChecklist
+    securityVendor: securityVendorChecklist,
+    stateVendor: getStateVendorChecklist({ ...options, deduplicate: false }),
+    stateVendorConsolidated: getStateVendorChecklist({ ...options, state: 'All', deduplicate: true }),
+    states: SUPPORTED_STATES,
+    country: 'India'
   };
 }
 
 function saveChecklists() {
   fs.writeFileSync(otherVendorChecklistPath, JSON.stringify(otherVendorChecklist, null, 2));
   fs.writeFileSync(securityVendorChecklistPath, JSON.stringify(securityVendorChecklist, null, 2));
+  fs.writeFileSync(stateVendorChecklistPath, JSON.stringify(stateVendorChecklist, null, 2));
+
+  // Sync to Firestore if initialized
+  try {
+    const { getDb } = require('../config/firebase');
+    const db = getDb();
+    if (db) {
+      // Optional async sync in background
+    }
+  } catch (e) {}
 }
 
 function addChecklistItem(vendorType, item) {
   const normalized = normalizeVendorType(vendorType);
+  const enrichedItem = {
+    ...item,
+    country: item.country || 'India',
+    state: item.state || 'N/A'
+  };
+
   if (normalized === OTHER_VENDOR) {
-    otherVendorChecklist.push(item);
+    otherVendorChecklist.push(enrichedItem);
     saveChecklists();
-    return item;
+    syncItemToFirestore(enrichedItem);
+    return enrichedItem;
   } else if (normalized === SECURITY_VENDOR) {
-    securityVendorChecklist.push(item);
+    securityVendorChecklist.push(enrichedItem);
     saveChecklists();
-    return item;
+    syncItemToFirestore(enrichedItem);
+    return enrichedItem;
+  } else if (normalized === STATE_VENDOR) {
+    stateVendorChecklist.push(enrichedItem);
+    saveChecklists();
+    syncItemToFirestore(enrichedItem);
+    return enrichedItem;
   }
   return null;
 }
 
 function updateChecklistItem(id, updates) {
   let found = false;
+  let targetItem = null;
 
   // Look in otherVendorChecklist
   for (let i = 0; i < otherVendorChecklist.length; i++) {
     if (otherVendorChecklist[i].id === id) {
       otherVendorChecklist[i] = { ...otherVendorChecklist[i], ...updates };
+      targetItem = otherVendorChecklist[i];
       found = true;
       break;
     }
@@ -161,6 +269,19 @@ function updateChecklistItem(id, updates) {
     for (let i = 0; i < securityVendorChecklist.length; i++) {
       if (securityVendorChecklist[i].id === id) {
         securityVendorChecklist[i] = { ...securityVendorChecklist[i], ...updates };
+        targetItem = securityVendorChecklist[i];
+        found = true;
+        break;
+      }
+    }
+  }
+
+  // Look in stateVendorChecklist if not found
+  if (!found) {
+    for (let i = 0; i < stateVendorChecklist.length; i++) {
+      if (stateVendorChecklist[i].id === id) {
+        stateVendorChecklist[i] = { ...stateVendorChecklist[i], ...updates };
+        targetItem = stateVendorChecklist[i];
         found = true;
         break;
       }
@@ -169,22 +290,39 @@ function updateChecklistItem(id, updates) {
 
   if (found) {
     saveChecklists();
+    if (targetItem) {
+      syncItemToFirestore(targetItem);
+    }
     return true;
   }
   return false;
 }
 
+function syncItemToFirestore(item) {
+  try {
+    const { getDb } = require('../config/firebase');
+    const db = getDb();
+    if (db && item && item.id) {
+      db.collection('compliance_checklists').doc(item.id).set(item, { merge: true }).catch(err => {
+        console.warn('Firestore syncItem error:', err.message);
+      });
+    }
+  } catch (e) {}
+}
+
 module.exports = {
   OTHER_VENDOR,
   SECURITY_VENDOR,
+  STATE_VENDOR,
+  SUPPORTED_STATES,
   normalizeVendorType,
   isValidVendorType,
   getVendorTypes,
   getChecklistByVendorType,
+  getStateVendorChecklist,
+  combineAndDeduplicateChecklist,
   getAllChecklists,
   addChecklistItem,
-  updateChecklistItem
+  updateChecklistItem,
+  reloadChecklistsFromDisk
 };
-
-
-
