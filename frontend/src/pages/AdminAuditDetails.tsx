@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { Loader2, CheckCircle2, Circle, FileText } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle, FileText, Calendar, Clock } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, updateAuditTimeline } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, parseFlexibleDate } from '../utils/dateUtils';
+import { DateInput } from '../components/DateInput';
 
 export const AdminAuditDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,7 +13,75 @@ export const AdminAuditDetails: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [usersMap, setUsersMap] = useState<Record<string, string>>({});
 
+  // Timeline Rescheduling State
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [isUpdatingTimeline, setIsUpdatingTimeline] = useState(false);
+  const [timelineError, setTimelineError] = useState('');
+  const [timelineSuccessMsg, setTimelineSuccessMsg] = useState('');
+
   const sidebarItems = getAdminSidebarItems('Audits');
+
+  const handleOpenTimelineModal = () => {
+    if (!audit) return;
+    setNewStartDate(audit.startDate || '');
+    setNewDueDate(audit.dueDate || '');
+    setTimelineError('');
+    setTimelineSuccessMsg('');
+    setShowTimelineModal(true);
+  };
+
+  const handleStartDateChange = (val: string) => {
+    setNewStartDate(val);
+    const sDate = parseFlexibleDate(val);
+    if (sDate) {
+      // Auto-suggest 2-3 days timeline (startDate + 2 days)
+      const dDate = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate() + 2);
+      const mStr = String(dDate.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(dDate.getDate()).padStart(2, '0');
+      setNewDueDate(`${dDate.getFullYear()}-${mStr}-${dayStr}`);
+    }
+  };
+
+  const handleSaveTimeline = async () => {
+    if (!audit || !id) return;
+    if (!newStartDate || !newDueDate) {
+      setTimelineError('Please enter both Scheduled Start Date and Compliance Due Date.');
+      return;
+    }
+    const sDate = parseFlexibleDate(newStartDate);
+    const dDate = parseFlexibleDate(newDueDate);
+    if (!sDate || !dDate) {
+      setTimelineError('Invalid date format.');
+      return;
+    }
+    if (dDate < sDate) {
+      setTimelineError('Due Date cannot be before Start Date.');
+      return;
+    }
+
+    try {
+      setIsUpdatingTimeline(true);
+      setTimelineError('');
+      const res = await updateAuditTimeline(id, newStartDate, newDueDate);
+      if (res && res.success) {
+        setAudit((prev: any) => ({ ...prev, startDate: newStartDate, dueDate: newDueDate }));
+        setTimelineSuccessMsg(`Timeline updated to ${formatDate(newStartDate)} - ${formatDate(newDueDate)} & notification email sent to auditor!`);
+        setTimeout(() => {
+          setShowTimelineModal(false);
+          setTimelineSuccessMsg('');
+        }, 2500);
+      } else {
+        setTimelineError(res?.error || 'Failed to update timeline.');
+      }
+    } catch (err: any) {
+      console.error('Failed to update timeline:', err);
+      setTimelineError(err.response?.data?.error || err.message || 'Failed to update timeline');
+    } finally {
+      setIsUpdatingTimeline(false);
+    }
+  };
 
   const handleSignOff = async () => {
     if (!window.confirm('Are you sure you want to sign off and close this audit?')) return;
@@ -138,7 +207,7 @@ export const AdminAuditDetails: React.FC = () => {
   const findingsUnderReview = audit.findingsPending ?? nonCompliantList.filter((f: any) => f.vendorResponse && f.status !== 'Resolved').length;
   const findingsOpen = audit.findingsOpen ?? Math.max(0, nonCompliantCount - findingsResolved - findingsUnderReview);
   const hasFindings = nonCompliantCount > 0 || nonCompliantList.length > 0;
-  
+
   return (
     <DashboardLayout title={`Audit Details - ${audit.auditIdString}`} sidebarItems={sidebarItems} backUrl="/admin/audits" backLabel="Back to Audits">
       {/* 1. Header */}
@@ -147,8 +216,8 @@ export const AdminAuditDetails: React.FC = () => {
           <div className="flex items-center gap-3">
             <h1 className="admin-header-title">{audit.auditIdString}</h1>
             <span className="audit-id-badge">Cycle {audit.auditPeriod}</span>
-            <span 
-              className="db-badge" 
+            <span
+              className="db-badge"
               style={{
                 backgroundColor: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#F3E8FF' : '#F1F5F9',
                 color: audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? '#7E22CE' : '#334155',
@@ -162,8 +231,8 @@ export const AdminAuditDetails: React.FC = () => {
               {audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit' ? 'Re-Audit' : 'Original Audit'}
             </span>
             {audit.isReadOnly && (
-              <span 
-                className="db-badge" 
+              <span
+                className="db-badge"
                 style={{
                   backgroundColor: '#FEF3C7',
                   color: '#92400E',
@@ -200,9 +269,34 @@ export const AdminAuditDetails: React.FC = () => {
           <div className="audit-panel-card">
             <div className="audit-panel-header">
               <h3 className="audit-panel-title">Audit Engagement Parameters</h3>
-              <span className="audit-panel-badge">
-                ID: {audit.id}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  disabled={isCompleted || audit.isReadOnly === true}
+                  onClick={(isCompleted || audit.isReadOnly === true) ? undefined : handleOpenTimelineModal}
+                  title={(isCompleted || audit.isReadOnly === true) ? (audit.isReadOnly ? "Audit is Read-Only — timeline cannot be edited" : "Audit is closed — timeline cannot be edited") : "Reschedule Audit Timeline & Notify Auditor"}
+                  style={{
+                    background: (isCompleted || audit.isReadOnly === true) ? '#F1F5F9' : '#EFF6FF',
+                    border: `1px solid ${(isCompleted || audit.isReadOnly === true) ? '#E2E8F0' : '#BFDBFE'}`,
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    cursor: (isCompleted || audit.isReadOnly === true) ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    color: (isCompleted || audit.isReadOnly === true) ? '#94A3B8' : '#1D4ED8',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    opacity: (isCompleted || audit.isReadOnly === true) ? 0.6 : 1
+                  }}
+                >
+                  <Calendar style={{ width: '13px', height: '13px', color: (isCompleted || audit.isReadOnly === true) ? '#94A3B8' : '#2563EB' }} />
+                  <span>Edit Timeline</span>
+                </button>
+                <span className="audit-panel-badge">
+                  ID: {audit.id}
+                </span>
+              </div>
             </div>
             <div className="audit-panel-body">
               <div className="audit-meta-grid">
@@ -493,7 +587,7 @@ export const AdminAuditDetails: React.FC = () => {
                     <p className="timeline-desc">{formatDate(audit.createdAt)}</p>
                   </div>
                 </div>
-                
+
                 <div className="timeline-item">
                   <div className="timeline-icon-wrapper">
                     <div className={`timeline-icon ${isStarted ? 'done' : 'upcoming'}`}>
@@ -533,6 +627,158 @@ export const AdminAuditDetails: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Reschedule Audit Timeline Modal */}
+      {showTimelineModal && audit && (
+        <div className="modal-overlay" onClick={() => !isUpdatingTimeline && setShowTimelineModal(false)}>
+          <div className="modal-card" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-icon-badge" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
+                <Clock className="w-6 h-6" />
+              </div>
+              <div className="modal-header-text">
+                <h3 className="modal-title">Reschedule Audit Timeline</h3>
+                <span className="modal-subtitle">Update submission dates and automatically notify auditor</span>
+              </div>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-info-box" style={{ marginBottom: '1.25rem' }}>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Audit ID:</span>
+                  <span className="modal-info-value mono">{audit.auditIdString || audit.id}</span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Period / Target:</span>
+                  <span className="modal-info-value">{audit.auditPeriod || 'N/A'}</span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Vendor:</span>
+                  <span className="modal-info-value">{audit.vendorName || audit.vendorId || 'N/A'}</span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Auditor:</span>
+                  <span className="modal-info-value">{audit.auditorName || audit.auditor || 'Auditor'}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    Scheduled Start Date <span style={{ color: '#DC2626' }}>*</span>
+                  </label>
+                  <DateInput
+                    value={newStartDate}
+                    placeholder="dd-mm-yyyy"
+                    onChange={e => handleStartDateChange(e.target.value)}
+                    disabled={isUpdatingTimeline}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2rem 0.5rem 0.65rem',
+                      fontSize: '0.8125rem',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      backgroundColor: isUpdatingTimeline ? '#F8FAFC' : '#FFFFFF',
+                      color: '#0F172A',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    Compliance Due Date <span style={{ color: '#DC2626' }}>*</span>
+                  </label>
+                  <DateInput
+                    value={newDueDate}
+                    placeholder="dd-mm-yyyy"
+                    onChange={e => setNewDueDate(e.target.value)}
+                    disabled={isUpdatingTimeline}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2rem 0.5rem 0.65rem',
+                      fontSize: '0.8125rem',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      backgroundColor: isUpdatingTimeline ? '#F8FAFC' : '#FFFFFF',
+                      color: '#0F172A',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{
+                background: '#F0FDF4',
+                border: '1px solid #BBF7D0',
+                borderRadius: '6px',
+                padding: '0.625rem 0.85rem',
+                fontSize: '0.75rem',
+                color: '#166534',
+                lineHeight: 1.45
+              }}>
+                📧 <strong>Notification:</strong> When you save, an automated email with the revised timeline will immediately be dispatched to the assigned auditor ({audit.auditorEmail || audit.auditor || 'Auditor'}) and vendor.
+              </div>
+
+              {timelineSuccessMsg && (
+                <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: '#DCFCE7', color: '#15803D', fontSize: '0.75rem', fontWeight: 700 }}>
+                  ✓ {timelineSuccessMsg}
+                </div>
+              )}
+
+              {timelineError && (
+                <div className="modal-error-text mt-3">
+                  {timelineError}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                disabled={isUpdatingTimeline}
+                onClick={() => setShowTimelineModal(false)}
+                className="btn-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingTimeline}
+                onClick={handleSaveTimeline}
+                style={{
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.8125rem',
+                  padding: '0.5rem 1.25rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  cursor: isUpdatingTimeline ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+                }}
+              >
+                {isUpdatingTimeline ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Rescheduling & Sending Email...</span>
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    <span>Save & Notify Auditor</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

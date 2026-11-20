@@ -109,6 +109,10 @@ export interface NonCompliantItemDetail {
   title: string;
   particulars: string;
   remarks: string;
+  vendorResponse?: string;
+  respondedAt?: string;
+  actionPlan?: string;
+  status?: string;
 }
 
 export interface CalculationResult {
@@ -131,6 +135,18 @@ export interface QuestionAnswerItem {
   attachmentSize?: number;
 }
 
+export interface InterviewProctoringResult {
+  integrityScore: number;
+  integrityStatus: 'Verified Clean' | 'Review Needed' | 'Flagged';
+  violations: {
+    faceMissingCount: number;
+    multipleFacesCount: number;
+    tabSwitchesCount: number;
+  };
+  durationSeconds: number;
+  verifiedAt: string;
+}
+
 export interface InterviewResource {
   id: string;
   name: string;
@@ -144,6 +160,10 @@ export interface InterviewResource {
   loginId?: string;
   pass?: string;
   isQuestionSaved?: boolean;
+  vendorId?: string;
+  vendorEmail?: string;
+  vendorName?: string;
+  proctoring?: InterviewProctoringResult | null;
 }
 
 export interface AuditRecord extends AuditInformation {

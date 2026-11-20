@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { ChecklistItem } from '../types/compliance';
 import { useAudit } from '../context/AuditContext';
-import { CheckCircle2, AlertTriangle, MinusCircle, MessageSquare, Scale, X, Layers } from 'lucide-react';
-import { getDisplayLaw } from '../utils/actLawMatcher';
+import { CheckCircle2, AlertTriangle, MinusCircle, MessageSquare, Scale, X, Layers, Paperclip, Download } from 'lucide-react';
+import { getDisplayLaw, handleLawButtonClick, downloadActRuleAttachment } from '../utils/actLawMatcher';
 
 interface ComplianceItemCardProps {
   item: ChecklistItem;
@@ -16,7 +16,10 @@ export const ComplianceItemCard: React.FC<ComplianceItemCardProps> = ({ item }) 
 
   const matchedLaw = getActLaw ? getActLaw(item) : null;
   const lawToDisplay = getDisplayLaw(item, matchedLaw);
-  const lawDescription = (matchedLaw?.description || '').trim();
+  const ruleAttachment = matchedLaw?.attachment || lawToDisplay?.attachment;
+  const lawDescription = (matchedLaw?.description || lawToDisplay?.description || '').trim();
+  const hasAttachment = Boolean(ruleAttachment && (ruleAttachment.fileData || (ruleAttachment as any).fileUrl));
+  const hasLawRule = Boolean(lawDescription || hasAttachment);
 
   const currentResponse = responses[item.id] || { status: '', remarks: '' };
   const currentStatus = currentResponse.status;
@@ -41,9 +44,15 @@ export const ComplianceItemCard: React.FC<ComplianceItemCardProps> = ({ item }) 
           {/* Law button near state number */}
           <button
             type="button"
-            className={`badge-law-btn ${lawDescription ? 'has-rule' : ''}`}
-            onClick={() => setIsLawModalOpen(true)}
-            title={`View Law & Statutory Rule for ${matchedLaw?.shortName || item.type || 'this Act'}`}
+            className={`badge-law-btn ${hasLawRule ? 'has-rule' : ''}`}
+            onClick={() => {
+              handleLawButtonClick(matchedLaw || lawToDisplay, () => setIsLawModalOpen(true));
+            }}
+            title={
+              !lawDescription && hasAttachment
+                ? `Download Attached Rule Document for ${lawToDisplay?.shortName || item.type || 'this Act'}`
+                : `View Law & Statutory Rule for ${lawToDisplay?.shortName || item.type || 'this Act'}`
+            }
           >
             <Scale className="w-3 h-3 mr-1 inline-block" />
             <span>Law</span>
@@ -212,6 +221,35 @@ export const ComplianceItemCard: React.FC<ComplianceItemCardProps> = ({ item }) 
                   </div>
                 )}
               </div>
+
+              {hasAttachment && ruleAttachment && (
+                <div style={{
+                  marginTop: '0.875rem', padding: '0.75rem 1rem', background: '#F0FDF4',
+                  border: '1px solid #BBF7D0', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                    <Paperclip className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ruleAttachment.fileName || 'Attached Statutory Rule Document'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadActRuleAttachment(ruleAttachment)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.4rem 0.85rem', borderRadius: '6px',
+                      background: '#059669', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700,
+                      border: 'none', cursor: 'pointer', transition: 'background 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#047857')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '#059669')}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download
+                  </button>
+                </div>
+              )}
 
               {lawToDisplay.states && lawToDisplay.states.length > 0 && (
                 <div className="law-modal-states">

@@ -215,18 +215,8 @@ exports.getAuditById = async (req, res) => {
     const scoringService = require('../services/scoringService');
     const checklistService = require('../services/checklistService');
 
-    let actRulesSnapshot = auditData.actRules;
-    if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
-      if (fs.existsSync(actRulesFilePath)) {
-        try {
-          actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
-        } catch (e) {
-          actRulesSnapshot = [];
-        }
-      } else {
-        actRulesSnapshot = [];
-      }
-    }
+    const { mergeWithLiveActRules } = require('./adminController');
+    const actRulesSnapshot = mergeWithLiveActRules(auditData.actRules);
 
     let fullData = { 
       id: doc.id, 
@@ -342,6 +332,87 @@ exports.uploadDocument = async (req, res) => {
     });
 
     await auditRef.update({ documents });
+
+    // Sync in-memory audits cache if available
+    try {
+      const adminController = require('./adminController');
+      if (adminController && typeof adminController.invalidateAuditsCache === 'function') {
+        adminController.invalidateAuditsCache(auditId, { documents });
+      }
+    } catch (cacheErr) {
+      // ignore
+    }
+
+    // Send email & in-app notification to the assigned auditor that document has been uploaded and audit can begin
+    try {
+      const auditData = doc.data();
+      let auditorEmail = auditData.auditorEmail;
+      let auditorName = auditData.auditorName || auditData.auditor || 'Auditor';
+      const auditorId = auditData.auditorId;
+
+      if (!auditorEmail && auditorId) {
+        try {
+          const userDoc = await db.collection('users').doc(auditorId).get();
+          if (userDoc.exists) {
+            const uData = userDoc.data();
+            auditorEmail = uData.email || auditorEmail;
+            auditorName = uData.fullName || uData.name || auditorName;
+          }
+        } catch (lookupErr) {
+          console.warn('[Vendor Controller]: Could not lookup auditor from users collection:', lookupErr.message);
+        }
+      }
+
+      const emailService = require('../services/emailService');
+      const { formatDate } = require('../utils/dateUtils');
+      const vendorName = req.user.name || auditData.vendorName || auditData.vendor || 'Vendor Partner';
+      const auditIdString = auditData.auditIdString || auditId;
+      const auditPeriod = auditData.auditPeriod || auditData.period || 'Current Period';
+      const customerName = auditData.customerName || auditData.customer || 'Enterprise Client';
+      const startDate = formatDate(auditData.startDate) || 'N/A';
+      const dueDate = formatDate(auditData.dueDate) || 'N/A';
+      const portalUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+      if (auditorEmail) {
+        emailService.sendAuditorDocumentUploadedEmail({
+          auditorEmail,
+          auditorName,
+          vendorName,
+          customerName,
+          auditIdString,
+          auditPeriod,
+          documentName: fileName,
+          documentType: type || 'General',
+          totalDocuments: documents.length,
+          startDate,
+          dueDate,
+          portalUrl
+        }).then(emailRes => {
+          if (emailRes && emailRes.success) {
+            console.log(`[Vendor Controller]: Document upload notification email successfully sent to auditor ${auditorEmail} for audit ${auditIdString}`);
+          }
+        }).catch(err => {
+          console.warn(`[Vendor Controller]: Failed to send document upload notification to auditor ${auditorEmail}:`, err.message);
+        });
+      }
+
+      if (auditorId) {
+        db.collection('notifications').add({
+          userId: auditorId,
+          role: 'Auditor',
+          title: '📁 Vendor Document Uploaded',
+          message: `${vendorName} uploaded "${fileName}" for audit ${auditIdString}. You can now begin your audit evaluation.`,
+          auditId,
+          type: 'document_uploaded',
+          read: false,
+          createdAt: new Date().toISOString()
+        }).catch(notifErr => {
+          console.warn('[Vendor Controller]: Could not create in-app notification for auditor:', notifErr.message);
+        });
+      }
+    } catch (notifErr) {
+      console.warn('[Vendor Controller]: Error triggering auditor document upload notification:', notifErr.message);
+    }
 
     res.status(200).json({ success: true, message: 'Document uploaded successfully', data: documents });
   } catch (error) {

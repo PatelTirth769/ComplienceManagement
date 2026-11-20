@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { 
-  LayoutDashboard, User, FileCheck, FolderOpen, 
+import {
+  LayoutDashboard, User, FileCheck, FolderOpen,
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Upload, FileText, Download, CheckCircle2,
   FileCheck2, ShieldCheck, ChevronDown, Search, X, Calendar, FileUp, Loader2, Filter
 } from 'lucide-react';
@@ -17,7 +17,7 @@ export const VendorDocuments: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
-  
+
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [docType, setDocType] = useState('General');
 
@@ -41,11 +41,11 @@ export const VendorDocuments: React.FC = () => {
         if (auditsRes.success && auditsRes.data && auditsRes.data.length > 0) {
           const auditList = auditsRes.data;
           setAudits(auditList);
-          
-          const active = auditList.find((a: any) => 
+
+          const active = auditList.find((a: any) =>
             ['scheduled', 'in progress', 'active'].includes((a.status || '').toLowerCase())
           ) || auditList[0];
-          
+
           setSelectedAuditId(active.id);
           setActiveAudit(active);
 
@@ -61,7 +61,7 @@ export const VendorDocuments: React.FC = () => {
             setAudits([audit]);
             setSelectedAuditId(audit.id);
             setActiveAudit(audit);
-            
+
             const docsResponse = await getVendorDocuments(audit.id);
             if (docsResponse.success) {
               setDocuments(docsResponse.data);
@@ -113,7 +113,7 @@ export const VendorDocuments: React.FC = () => {
 
   const handleUpload = async () => {
     if (!fileToUpload || !activeAudit) return;
-    
+
     if (fileToUpload.size > MAX_FILE_SIZE_BYTES) {
       alert('Max size limit is 5MB');
       return;
@@ -125,13 +125,13 @@ export const VendorDocuments: React.FC = () => {
       reader.readAsDataURL(fileToUpload);
       reader.onload = async () => {
         const base64Data = reader.result as string;
-        
+
         const response = await uploadVendorDocument(activeAudit.id, {
           fileName: fileToUpload.name,
           fileData: base64Data,
           type: docType
         });
-        
+
         if (response.success) {
           alert('Document uploaded successfully!');
           setDocuments(response.data);
@@ -298,7 +298,7 @@ export const VendorDocuments: React.FC = () => {
               <FileUp className="w-5 h-5" />
             </div>
           </div>
-          <div className="admin-kpi-value">PDF, PNG, JPG</div>
+          <div className="admin-kpi-value">PDF, PNG, JPG, Excel</div>
           <span className="admin-kpi-subtext">Up to 5 MB per verified file</span>
           <span className="admin-kpi-badge">Certified</span>
         </div>
@@ -336,7 +336,7 @@ export const VendorDocuments: React.FC = () => {
                 <div className="vdocs-form-group">
                   <label className="vdocs-label">Select Audit Engagement</label>
                   <div className="vdocs-select-wrapper">
-                    <select 
+                    <select
                       className="vdocs-select"
                       value={selectedAuditId}
                       onChange={(e) => handleAuditChange(e.target.value)}
@@ -356,7 +356,7 @@ export const VendorDocuments: React.FC = () => {
               <div className="vdocs-form-group">
                 <label className="vdocs-label">Document Category</label>
                 <div className="vdocs-select-wrapper">
-                  <select 
+                  <select
                     className="vdocs-select"
                     value={docType}
                     onChange={(e) => setDocType(e.target.value)}
@@ -374,7 +374,7 @@ export const VendorDocuments: React.FC = () => {
               {/* Select File Dropzone */}
               <div className="vdocs-form-group">
                 <label className="vdocs-label">Select File Attachment</label>
-                <label 
+                <label
                   htmlFor="file-upload-input"
                   className="vdocs-dropzone"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -401,13 +401,13 @@ export const VendorDocuments: React.FC = () => {
                     Choose statutory document
                   </span>
                   <span className="vdocs-dropzone-hint">
-                    PDF, PNG, JPG (Max 5 MB)
+                    PDF, PNG, JPG, Excel (Max 5 MB)
                   </span>
-                  <input 
+                  <input
                     id="file-upload-input"
-                    type="file" 
-                    style={{ display: 'none' }} 
-                    onChange={handleFileChange} 
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
                   />
                 </label>
 
@@ -419,7 +419,7 @@ export const VendorDocuments: React.FC = () => {
                         {fileToUpload.name}
                       </span>
                     </div>
-                    <button 
+                    <button
                       type="button"
                       className="vdocs-selected-remove"
                       onClick={(e) => {
@@ -437,7 +437,7 @@ export const VendorDocuments: React.FC = () => {
               </div>
 
               {/* Submit Button */}
-              <button 
+              <button
                 onClick={handleUpload}
                 disabled={!fileToUpload || isUploading}
                 className={`vdocs-submit-btn ${!fileToUpload || isUploading ? 'disabled' : 'enabled'}`}
@@ -474,9 +474,9 @@ export const VendorDocuments: React.FC = () => {
             <div className="table-toolbar" style={{ padding: '0.875rem 1.375rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div className="search-input-wrapper" style={{ flex: '1', minWidth: '200px', maxWidth: '300px' }}>
                 <Search className="search-input-icon" />
-                <input 
-                  type="text" 
-                  placeholder="Filter uploaded files..." 
+                <input
+                  type="text"
+                  placeholder="Filter uploaded files..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -565,7 +565,7 @@ export const VendorDocuments: React.FC = () => {
                               </div>
                             </td>
                             <td style={{ textAlign: 'right' }}>
-                              <button 
+                              <button
                                 onClick={() => handleDownload(doc)}
                                 className="vdocs-download-btn"
                                 title="Download file"

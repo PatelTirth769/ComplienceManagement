@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Building2,
   MapPin,
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import { useAuth } from '../context/AuthContext';
-import { getAssignedAudits, getAuditDocuments, getAuditDocumentUrl, saveInterviewResources } from '../services/api';
+import { getAssignedAudits, getAuditDocuments, getAuditDocumentUrl, saveInterviewResources, getVendorsList, type VendorOption } from '../services/api';
 import type { InterviewResource } from '../types/compliance';
 import { DateInput } from './DateInput';
 import { formatDateTime } from '../utils/dateUtils';
@@ -61,6 +61,64 @@ export const AuditInformation: React.FC = () => {
   const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
   const [savingResources, setSavingResources] = useState<boolean>(false);
   const [resourcesSavedSuccess, setResourcesSavedSuccess] = useState<boolean>(false);
+  const [vendorsList, setVendorsList] = useState<VendorOption[]>([]);
+
+  useEffect(() => {
+    getVendorsList().then(list => {
+      if (Array.isArray(list) && list.length > 0) {
+        setVendorsList(list);
+      }
+    }).catch(console.warn);
+  }, []);
+
+  const allVendorOptions = useMemo(() => {
+    const map = new Map<string, VendorOption>();
+
+    vendorsList.forEach(v => {
+      const trimmed = (v.name || '').trim();
+      if (trimmed) map.set(trimmed.toLowerCase(), { id: v.id, name: trimmed, email: v.email || '' });
+    });
+
+    if (selectedAudit) {
+      const svName = (selectedAudit.vendorName || selectedAudit.vendor || '').trim();
+      if (svName && !map.has(svName.toLowerCase())) {
+        map.set(svName.toLowerCase(), {
+          id: selectedAudit.vendorId || svName,
+          name: svName,
+          email: selectedAudit.vendorEmail || ''
+        });
+      }
+    }
+
+    assignedAudits.forEach(a => {
+      const vName = (a.vendorName || a.vendor || '').trim();
+      if (vName && !map.has(vName.toLowerCase())) {
+        map.set(vName.toLowerCase(), {
+          id: a.vendorId || vName,
+          name: vName,
+          email: a.vendorEmail || ''
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [vendorsList, selectedAudit, assignedAudits]);
+
+  const handleVendorSelect = (id: string, vendorName: string) => {
+    const foundVendor = allVendorOptions.find(v => v.name.toLowerCase() === vendorName.toLowerCase());
+    setInterviewResources(prev => prev.map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          name: vendorName,
+          vendorEmail: foundVendor?.email || (r as any).vendorEmail || '',
+          vendorId: foundVendor?.id || (r as any).vendorId || ''
+        };
+      }
+      return r;
+    }));
+    setResourcesSavedSuccess(false);
+  };
 
   const isInterviewAuditEnabled = selectedAudit?.interviewAudit === true || selectedAudit?.isInterviewAuditEnabled === true;
 
@@ -96,23 +154,25 @@ export const AuditInformation: React.FC = () => {
     if (!targetId) return;
     try {
       setSavingResources(true);
-      // Immediately change status to 'Initiate' when auditor clicks Save Resources
+      // Change status to 'Initiate' for newly scheduled resources, preserving existing 'Completed' or evaluated status
       const updatedResources = interviewResources.map(r => ({
         ...r,
-        status: 'Initiate'
+        status: (r.status === 'Completed' || r.status === 'Compliant' || r.status === 'Non-Compliant' || (r.answer && r.answer.trim().length > 0))
+          ? (r.status || 'Completed')
+          : 'Initiate'
       }));
       setInterviewResources(updatedResources);
 
-      const auditorEmail = user?.email || selectedAudit?.auditorEmail;
-      const res = await saveInterviewResources(targetId, updatedResources, auditorEmail);
+      const targetVendorEmail = (updatedResources.find(r => (r as any).vendorEmail) as any)?.vendorEmail || selectedAudit?.vendorEmail || user?.email;
+      const res = await saveInterviewResources(targetId, updatedResources, targetVendorEmail);
       if (res && res.data && Array.isArray(res.data)) {
         setInterviewResources(res.data);
       }
 
-      setSelectedAudit((prev: any) => prev ? { 
-        ...prev, 
+      setSelectedAudit((prev: any) => prev ? {
+        ...prev,
         interviewResources: (res && res.data) ? res.data : updatedResources,
-        status: (prev.status === 'Scheduled' || !prev.status) ? 'Initiate' : prev.status 
+        status: (prev.status === 'Scheduled' || !prev.status) ? 'Initiate' : prev.status
       } : prev);
       setResourcesSavedSuccess(true);
       setTimeout(() => setResourcesSavedSuccess(false), 3000);
@@ -141,8 +201,14 @@ export const AuditInformation: React.FC = () => {
             const found = audits.find(a => a.id === lastActiveId || a.auditIdString === lastActiveId);
             if (found) targetAudit = found;
           } else {
-            const withScore = audits.find(a => typeof a.score === 'number' || a.summary);
-            if (withScore) targetAudit = withScore;
+            // Prefer an audit that needs evaluation (Initiate, Scheduled, In Progress)
+            const toEvaluate = audits.find(a => !a.isReadOnly && (typeof a.score !== 'number' && !a.summary));
+            if (toEvaluate) {
+              targetAudit = toEvaluate;
+            } else {
+              const withScore = audits.find(a => typeof a.score === 'number' || a.summary);
+              if (withScore) targetAudit = withScore;
+            }
           }
 
           handleSelectAudit(targetAudit);
@@ -838,7 +904,7 @@ export const AuditInformation: React.FC = () => {
 
       {/* SECTION: Add Resources (Interview Audit Module) - Rendered below Number of Employees when enabled */}
       {isInterviewAuditEnabled && (
-        <div 
+        <div
           className="interview-audit-card"
           style={{
             marginTop: '1.5rem',
@@ -947,14 +1013,12 @@ export const AuditInformation: React.FC = () => {
                 ) : (
                   interviewResources.map((row, index) => (
                     <tr key={row.id || index} style={{ borderBottom: index < interviewResources.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                      {/* Name */}
+                      {/* Name - Vendor Dropdown */}
                       <td style={{ padding: '0.5rem 0.75rem' }}>
-                        <input
-                          type="text"
-                          value={row.name}
-                          onChange={e => handleResourceChange(row.id, 'name', e.target.value)}
+                        <select
+                          value={row.name || ''}
+                          onChange={e => handleVendorSelect(row.id, e.target.value)}
                           disabled={isReadOnly}
-                          placeholder="e.g. Employee Name"
                           style={{
                             width: '100%',
                             padding: '0.4rem 0.6rem',
@@ -962,23 +1026,34 @@ export const AuditInformation: React.FC = () => {
                             borderRadius: '6px',
                             border: '1px solid #CBD5E1',
                             backgroundColor: isReadOnly ? '#F8FAFC' : '#FFFFFF',
-                            color: '#0F172A',
+                            color: row.name ? '#0F172A' : '#64748B',
                             outline: 'none',
-                            boxSizing: 'border-box'
+                            boxSizing: 'border-box',
+                            cursor: isReadOnly ? 'not-allowed' : 'pointer'
                           }}
-                        />
+                        >
+                          <option value="">-- Select Vendor --</option>
+                          {row.name && !allVendorOptions.some(v => v.name.toLowerCase() === (row.name || '').toLowerCase()) && (
+                            <option value={row.name}>{row.name}</option>
+                          )}
+                          {allVendorOptions.map(v => (
+                            <option key={v.id || v.name} value={v.name} style={{ color: '#0F172A' }}>
+                              {v.name}
+                            </option>
+                          ))}
+                        </select>
                       </td>
 
                       {/* Pre Date */}
                       <td style={{ padding: '0.5rem 0.75rem' }}>
-                        <input
-                          type="date"
+                        <DateInput
                           value={row.preDate}
+                          placeholder="dd-mm-yyyy"
                           onChange={e => handleResourceChange(row.id, 'preDate', e.target.value)}
                           disabled={isReadOnly}
                           style={{
                             width: '100%',
-                            padding: '0.4rem 0.5rem',
+                            padding: '0.4rem 2rem 0.4rem 0.5rem',
                             fontSize: '0.8125rem',
                             borderRadius: '6px',
                             border: '1px solid #CBD5E1',
@@ -992,14 +1067,14 @@ export const AuditInformation: React.FC = () => {
 
                       {/* Final Date */}
                       <td style={{ padding: '0.5rem 0.75rem' }}>
-                        <input
-                          type="date"
+                        <DateInput
                           value={row.finalDate}
+                          placeholder="dd-mm-yyyy"
                           onChange={e => handleResourceChange(row.id, 'finalDate', e.target.value)}
                           disabled={isReadOnly}
                           style={{
                             width: '100%',
-                            padding: '0.4rem 0.5rem',
+                            padding: '0.4rem 2rem 0.4rem 0.5rem',
                             fontSize: '0.8125rem',
                             borderRadius: '6px',
                             border: '1px solid #CBD5E1',
@@ -1049,9 +1124,9 @@ export const AuditInformation: React.FC = () => {
                             backgroundColor: isReadOnly ? '#F8FAFC' : '#FFFFFF',
                             color: row.status === 'Initiate' ? '#1D4ED8'
                               : row.status === 'Completed' || row.status === 'Compliant' ? '#047857'
-                              : row.status === 'Non-Compliant' ? '#B91C1C'
-                              : row.status === 'In Progress' ? '#2563EB'
-                              : '#475569',
+                                : row.status === 'Non-Compliant' ? '#B91C1C'
+                                  : row.status === 'In Progress' ? '#2563EB'
+                                    : '#475569',
                             outline: 'none',
                             cursor: isReadOnly ? 'default' : 'pointer',
                             boxSizing: 'border-box'

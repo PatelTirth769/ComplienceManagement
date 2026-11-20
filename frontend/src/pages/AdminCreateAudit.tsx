@@ -122,6 +122,22 @@ export const AdminCreateAudit: React.FC = () => {
     }));
   };
 
+  const handleStartDateChange = (val: string) => {
+    const sDate = parseFlexibleDate(val);
+    let autoDueDate = formData.dueDate;
+    if (sDate) {
+      const dDate = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate() + 2);
+      const mStr = String(dDate.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(dDate.getDate()).padStart(2, '0');
+      autoDueDate = `${dDate.getFullYear()}-${mStr}-${dayStr}`;
+    }
+    setFormData(prev => ({
+      ...prev,
+      startDate: val,
+      dueDate: autoDueDate
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -419,7 +435,7 @@ export const AdminCreateAudit: React.FC = () => {
                     required 
                     className="admin-form-input" 
                     value={formData.startDate} 
-                    onChange={e => setFormData({...formData, startDate: e.target.value})} 
+                    onChange={e => handleStartDateChange(e.target.value)} 
                   />
                 </div>
 

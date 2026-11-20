@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
 import {
   Users, CheckCircle2, Trash2, Plus, Loader2,
   MessageSquareQuote, Building2, Calendar, AlertCircle,
   FileCheck, Check, Sparkles, HelpCircle, FileText,
-  Paperclip, ExternalLink
+  Paperclip, ExternalLink, Camera, ShieldCheck, Eye, AlertTriangle
 } from 'lucide-react';
-import { getAdminAudits, saveInterviewResources } from '../services/api';
+import { getAdminAudits, saveInterviewResources, getVendorsList, type VendorOption } from '../services/api';
 import type { InterviewResource, QuestionAnswerItem } from '../types/compliance';
+import { DateInput } from '../components/DateInput';
 
 export const AdminInterview: React.FC = () => {
   const sidebarItems = getAdminSidebarItems('Interview');
@@ -19,6 +20,48 @@ export const AdminInterview: React.FC = () => {
   const [interviewResources, setInterviewResources] = useState<InterviewResource[]>([]);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [savedQuestionResourceIds, setSavedQuestionResourceIds] = useState<Set<string>>(new Set());
+  const [vendorsList, setVendorsList] = useState<VendorOption[]>([]);
+
+  useEffect(() => {
+    getVendorsList().then(list => {
+      if (Array.isArray(list) && list.length > 0) {
+        setVendorsList(list);
+      }
+    }).catch(console.warn);
+  }, []);
+
+  const allVendorOptions = useMemo(() => {
+    const map = new Map<string, VendorOption>();
+
+    vendorsList.forEach(v => {
+      const trimmed = (v.name || '').trim();
+      if (trimmed) map.set(trimmed.toLowerCase(), { id: v.id, name: trimmed, email: v.email || '' });
+    });
+
+    if (selectedAudit) {
+      const svName = (selectedAudit.vendorName || selectedAudit.vendor || '').trim();
+      if (svName && !map.has(svName.toLowerCase())) {
+        map.set(svName.toLowerCase(), {
+          id: selectedAudit.vendorId || svName,
+          name: svName,
+          email: selectedAudit.vendorEmail || ''
+        });
+      }
+    }
+
+    audits.forEach(a => {
+      const vName = (a.vendorName || a.vendor || '').trim();
+      if (vName && !map.has(vName.toLowerCase())) {
+        map.set(vName.toLowerCase(), {
+          id: a.vendorId || vName,
+          name: vName,
+          email: a.vendorEmail || ''
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [vendorsList, selectedAudit, audits]);
 
   const [isLoadingAudits, setIsLoadingAudits] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -75,7 +118,8 @@ export const AdminInterview: React.FC = () => {
                   ...r,
                   answer: event.data.answer !== undefined ? event.data.answer : (event.data.questions?.[0]?.answer ?? r.answer),
                   questions: event.data.questions || r.questions,
-                  status: 'In Progress'
+                  status: event.data.status || 'Completed',
+                  proctoring: event.data.proctoring || r.proctoring
                 };
               }
               return r;
@@ -163,10 +207,20 @@ export const AdminInterview: React.FC = () => {
         const prevMap = new Map(prev.map(r => [r.id, r]));
         return sourceResources.map((incoming: any) => {
           const ex = prevMap.get(incoming.id);
-          // Also look for answers across other audits in memory (e.g. parent audit or re-audit)
-          const allOtherRes = (audits || []).flatMap(a => a.interviewResources || []).find((rr: any) =>
-            (rr.id && rr.id === incoming.id) || (rr.loginId && rr.loginId === incoming.loginId)
-          );
+          // Look for answers across directly related Re-Audit / Parent audit ONLY by unique candidate loginId
+          const isRelatedAudit = (a: any) =>
+            a.id !== audit.id && (
+              a.id === audit.parentAuditId ||
+              a.id === audit.originalAuditId ||
+              audit.parentAuditId === a.id ||
+              audit.originalAuditId === a.id ||
+              (audit.auditIdString && a.auditIdString && audit.auditIdString.replace(/-RA\d*$/, '') === a.auditIdString.replace(/-RA\d*$/, ''))
+            );
+
+          const allOtherRes = (audits || [])
+            .filter(isRelatedAudit)
+            .flatMap(a => a.interviewResources || [])
+            .find((rr: any) => incoming.loginId && rr.loginId && rr.loginId === incoming.loginId);
 
           const mergedQuestions = (incoming.questions || []).map((iq: any, idx: number) => {
             const exQ: any = (ex?.questions && ex.questions[idx]) || {};
@@ -183,10 +237,25 @@ export const AdminInterview: React.FC = () => {
 
           const finalAnswer = incoming.answer || ex?.answer || allOtherRes?.answer || mergedQuestions[0]?.answer || '';
 
+          // Proctoring belongs strictly to this candidate's proctored exam session
+          const ownProctoring = incoming.proctoring || (ex && ex.id === incoming.id ? ex.proctoring : null) || null;
+
+          // If candidate has completed and answered the interview, or proctoring is recorded, status is 'Completed'
+          const candidateHasAnswered = Boolean(
+            (finalAnswer && finalAnswer.trim().length > 0) ||
+            ownProctoring ||
+            (mergedQuestions && mergedQuestions.some((mq: any) => mq.answer && mq.answer.trim().length > 0))
+          );
+          const resolvedStatus = (incoming.status === 'In Progress' || incoming.status === 'Initiate' || !incoming.status) && candidateHasAnswered
+            ? 'Completed'
+            : (incoming.status || 'Scheduled');
+
           return {
             ...incoming,
+            status: resolvedStatus,
             answer: finalAnswer,
-            questions: mergedQuestions.length > 0 ? mergedQuestions : incoming.questions
+            questions: mergedQuestions.length > 0 ? mergedQuestions : incoming.questions,
+            proctoring: ownProctoring
           };
         });
       });
@@ -257,9 +326,12 @@ export const AdminInterview: React.FC = () => {
     setInterviewResources(prev => prev.map(r => {
       if (r.id === id) {
         const updated = { ...r, [field]: val };
-        // If ask was updated and question was empty, keep question in sync as a convenience
-        if (field === 'ask' && !r.question) {
-          updated.question = val;
+        if (field === 'name') {
+          const matchedVendor = allVendorOptions.find(v => v.name.toLowerCase() === val.trim().toLowerCase());
+          if (matchedVendor) {
+            updated.vendorEmail = matchedVendor.email || updated.vendorEmail;
+            updated.vendorId = matchedVendor.id || updated.vendorId;
+          }
         }
         return updated;
       }
@@ -297,8 +369,7 @@ export const AdminInterview: React.FC = () => {
         return {
           ...r,
           questions: updatedList,
-          question: updatedList[0]?.question || val,
-          ask: r.ask || updatedList[0]?.question || val
+          question: updatedList[0]?.question || val
         };
       }
       return r;
@@ -367,7 +438,7 @@ export const AdminInterview: React.FC = () => {
     if (!selectedResourceId) return;
     setInterviewResources(prev => prev.map(r => {
       if (r.id === selectedResourceId) {
-        return { ...r, question: val, ask: r.ask || val };
+        return { ...r, question: val };
       }
       return r;
     }));
@@ -393,13 +464,15 @@ export const AdminInterview: React.FC = () => {
     }
     try {
       setIsSaving(true);
-      const emailCandidate = selectedAudit?.auditorEmail;
-      const auditorField = (selectedAudit as any)?.auditor;
-      const validEmail = (emailCandidate && emailCandidate.includes('@'))
-        ? emailCandidate.trim()
-        : (auditorField && auditorField.includes('@'))
-          ? auditorField.trim()
-          : undefined;
+      const targetResource = interviewResources.find(r => r.id === selectedResourceId) || interviewResources[0];
+      const matchedVendor = targetResource?.name
+        ? allVendorOptions.find(v => v.name.toLowerCase() === targetResource.name.trim().toLowerCase())
+        : null;
+
+      const vendorEmailCandidate = targetResource?.vendorEmail || matchedVendor?.email || selectedAudit?.vendorEmail;
+      const validEmail = (vendorEmailCandidate && vendorEmailCandidate.includes('@'))
+        ? vendorEmailCandidate.trim()
+        : undefined;
 
       const updatedWithSavedFlag = interviewResources.map(r => {
         if (r.question && r.question.trim().length > 0) {
@@ -442,13 +515,15 @@ export const AdminInterview: React.FC = () => {
     }
     try {
       setIsSaving(true);
-      const emailCandidate = selectedAudit?.auditorEmail;
-      const auditorField = (selectedAudit as any)?.auditor;
-      const validEmail = (emailCandidate && emailCandidate.includes('@'))
-        ? emailCandidate.trim()
-        : (auditorField && auditorField.includes('@'))
-          ? auditorField.trim()
-          : undefined;
+      const targetResource = interviewResources.find(r => r.id === selectedResourceId) || interviewResources[0];
+      const matchedVendor = targetResource?.name
+        ? allVendorOptions.find(v => v.name.toLowerCase() === targetResource.name.trim().toLowerCase())
+        : null;
+
+      const vendorEmailCandidate = targetResource?.vendorEmail || matchedVendor?.email || selectedAudit?.vendorEmail;
+      const validEmail = (vendorEmailCandidate && vendorEmailCandidate.includes('@'))
+        ? vendorEmailCandidate.trim()
+        : undefined;
 
       // Mark the selected resource as question-saved so questions become read-only
       const updatedWithSavedFlag = interviewResources.map(r => {
@@ -761,13 +836,14 @@ export const AdminInterview: React.FC = () => {
                   <th style={{ padding: '0.625rem 0.75rem', fontWeight: 700, color: '#334155', minWidth: '135px' }}>Final Date</th>
                   <th style={{ padding: '0.625rem 0.75rem', fontWeight: 700, color: '#334155', minWidth: '180px' }}>Ask</th>
                   <th style={{ padding: '0.625rem 0.75rem', fontWeight: 700, color: '#334155', minWidth: '130px' }}>Status</th>
+                  <th style={{ padding: '0.625rem 0.75rem', fontWeight: 700, color: '#334155', minWidth: '130px', textAlign: 'center' }}>AI Proctor</th>
                   <th style={{ padding: '0.625rem 0.75rem', width: '40px', textAlign: 'center' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {interviewResources.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
+                    <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
                       <p style={{ margin: 0, fontWeight: 700, fontSize: '0.875rem', color: '#334155' }}>
                         No interview resources saved by the auditor yet
                       </p>
@@ -802,14 +878,12 @@ export const AdminInterview: React.FC = () => {
                           />
                         </td>
 
-                        {/* Name */}
+                        {/* Name - Vendor Dropdown */}
                         <td style={{ padding: '0.5rem 0.75rem' }}>
-                          <input
-                            type="text"
-                            value={row.name}
+                          <select
+                            value={row.name || ''}
                             onChange={e => handleResourceChange(row.id, 'name', e.target.value)}
                             onClick={e => e.stopPropagation()}
-                            placeholder="e.g. Employee Name"
                             style={{
                               width: '100%',
                               padding: '0.4rem 0.6rem',
@@ -817,23 +891,33 @@ export const AdminInterview: React.FC = () => {
                               borderRadius: '6px',
                               border: isRowSelected ? '1.5px solid #93C5FD' : '1px solid #CBD5E1',
                               backgroundColor: '#FFFFFF',
-                              color: '#0F172A',
+                              color: row.name ? '#0F172A' : '#64748B',
                               outline: 'none',
-                              boxSizing: 'border-box'
+                              boxSizing: 'border-box',
+                              cursor: 'pointer'
                             }}
-                          />
+                          >
+                            <option value="">-- Select Vendor --</option>
+                            {row.name && !allVendorOptions.some(v => v.name.toLowerCase() === (row.name || '').toLowerCase()) && (
+                              <option value={row.name}>{row.name}</option>
+                            )}
+                            {allVendorOptions.map(v => (
+                              <option key={v.id || v.name} value={v.name} style={{ color: '#0F172A' }}>
+                                {v.name}
+                              </option>
+                            ))}
+                          </select>
                         </td>
 
                         {/* Pre Date */}
-                        <td style={{ padding: '0.5rem 0.75rem' }}>
-                          <input
-                            type="date"
+                        <td style={{ padding: '0.5rem 0.75rem' }} onClick={e => e.stopPropagation()}>
+                          <DateInput
                             value={row.preDate}
+                            placeholder="dd-mm-yyyy"
                             onChange={e => handleResourceChange(row.id, 'preDate', e.target.value)}
-                            onClick={e => e.stopPropagation()}
                             style={{
                               width: '100%',
-                              padding: '0.4rem 0.5rem',
+                              padding: '0.4rem 2rem 0.4rem 0.5rem',
                               fontSize: '0.8125rem',
                               borderRadius: '6px',
                               border: isRowSelected ? '1.5px solid #93C5FD' : '1px solid #CBD5E1',
@@ -846,15 +930,14 @@ export const AdminInterview: React.FC = () => {
                         </td>
 
                         {/* Final Date */}
-                        <td style={{ padding: '0.5rem 0.75rem' }}>
-                          <input
-                            type="date"
+                        <td style={{ padding: '0.5rem 0.75rem' }} onClick={e => e.stopPropagation()}>
+                          <DateInput
                             value={row.finalDate}
+                            placeholder="dd-mm-yyyy"
                             onChange={e => handleResourceChange(row.id, 'finalDate', e.target.value)}
-                            onClick={e => e.stopPropagation()}
                             style={{
                               width: '100%',
-                              padding: '0.4rem 0.5rem',
+                              padding: '0.4rem 2rem 0.4rem 0.5rem',
                               fontSize: '0.8125rem',
                               borderRadius: '6px',
                               border: isRowSelected ? '1.5px solid #93C5FD' : '1px solid #CBD5E1',
@@ -920,6 +1003,38 @@ export const AdminInterview: React.FC = () => {
                             <option value="Compliant">Compliant</option>
                             <option value="Non-Compliant">Non-Compliant</option>
                           </select>
+                        </td>
+
+                        {/* AI Proctor Status Pill */}
+                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center' }}>
+                          {row.proctoring ? (
+                            <span
+                              title={`Integrity Score: ${row.proctoring.integrityScore}% (${row.proctoring.integrityStatus}) - ${row.proctoring.violations?.tabSwitchesCount || 0} Tab switches, ${row.proctoring.violations?.faceMissingCount || 0} Face-off events`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '999px',
+                                fontSize: '0.725rem',
+                                fontWeight: 800,
+                                backgroundColor: row.proctoring.integrityStatus === 'Verified Clean' ? '#DCFCE7' : row.proctoring.integrityStatus === 'Review Needed' ? '#FEF9C3' : '#FEE2E2',
+                                color: row.proctoring.integrityStatus === 'Verified Clean' ? '#166534' : row.proctoring.integrityStatus === 'Review Needed' ? '#854D0E' : '#991B1B',
+                                border: `1px solid ${row.proctoring.integrityStatus === 'Verified Clean' ? '#86EFAC' : row.proctoring.integrityStatus === 'Review Needed' ? '#FDE047' : '#FCA5A5'}`
+                              }}
+                            >
+                              <Sparkles size={11} /> {row.proctoring.integrityScore}% {row.proctoring.integrityStatus === 'Verified Clean' ? 'Clean' : row.proctoring.integrityStatus === 'Review Needed' ? 'Review' : 'Flagged'}
+                            </span>
+                          ) : (
+                            <span style={{
+                              fontSize: '0.725rem',
+                              color: '#94A3B8',
+                              fontWeight: 600,
+                              fontStyle: 'italic'
+                            }}>
+                              Pending Exam
+                            </span>
+                          )}
                         </td>
 
                         {/* Delete Action */}
@@ -1034,6 +1149,116 @@ export const AdminInterview: React.FC = () => {
                 )}
                 {isQuestionReadOnly ? 'Question Saved' : 'Save Question'}
               </button>
+            </div>
+
+            {/* AI PROCTORING & CANDIDATE INTEGRITY CARD */}
+            <div style={{
+              backgroundColor: currentResource.proctoring ? '#F8FAFC' : '#FAFCFF',
+              border: currentResource.proctoring
+                ? (currentResource.proctoring.integrityStatus === 'Verified Clean' ? '1.5px solid #86EFAC' : currentResource.proctoring.integrityStatus === 'Review Needed' ? '1.5px solid #FDE047' : '1.5px solid #FCA5A5')
+                : '1.5px dashed #CBD5E1',
+              borderRadius: '10px',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.25rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: currentResource.proctoring ? '0.75rem' : '0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '30px', height: '30px', borderRadius: '6px',
+                    backgroundColor: currentResource.proctoring ? '#EFF6FF' : '#F1F5F9',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: currentResource.proctoring ? '#2563EB' : '#64748B'
+                  }}>
+                    <Camera size={16} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      AI Proctoring & Candidate Verification
+                      <span style={{
+                        fontSize: '0.675rem', fontWeight: 700, backgroundColor: '#EFF6FF',
+                        color: '#1D4ED8', padding: '1px 6px', borderRadius: '4px', border: '1px solid #BFDBFE'
+                      }}>
+                        Zero Storage • Real-Time AI
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.725rem', color: '#64748B' }}>
+                      {currentResource.proctoring
+                        ? `Exam proctored via browser AI at ${new Date(currentResource.proctoring.verifiedAt).toLocaleString()} (${currentResource.proctoring.durationSeconds}s duration)`
+                        : 'Webcam AI active on candidate portal. When candidate opens examination link, presence and tab focus are tracked.'}
+                    </div>
+                  </div>
+                </div>
+
+                {currentResource.proctoring ? (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    backgroundColor: currentResource.proctoring.integrityStatus === 'Verified Clean' ? '#DCFCE7' : currentResource.proctoring.integrityStatus === 'Review Needed' ? '#FEF9C3' : '#FEE2E2',
+                    border: `1px solid ${currentResource.proctoring.integrityStatus === 'Verified Clean' ? '#86EFAC' : currentResource.proctoring.integrityStatus === 'Review Needed' ? '#FDE047' : '#FCA5A5'}`,
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    color: currentResource.proctoring.integrityStatus === 'Verified Clean' ? '#166534' : currentResource.proctoring.integrityStatus === 'Review Needed' ? '#854D0E' : '#991B1B'
+                  }}>
+                    <Sparkles size={13} />
+                    Trust Score: {currentResource.proctoring.integrityScore}% — {currentResource.proctoring.integrityStatus}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, backgroundColor: '#F1F5F9', padding: '0.2rem 0.6rem', borderRadius: '6px' }}>
+                    Awaiting Candidate Response
+                  </span>
+                )}
+              </div>
+
+              {/* Metric Breakdown Grid if proctoring result exists */}
+              {currentResource.proctoring && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '0.75rem',
+                  marginTop: '0.5rem',
+                  paddingTop: '0.75rem',
+                  borderTop: '1px solid #E2E8F0'
+                }}>
+                  {/* Metric 1: Face Presence */}
+                  <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Eye size={12} color="#2563EB" /> Face Presence
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: currentResource.proctoring.violations.faceMissingCount === 0 ? '#166534' : '#DC2626', marginTop: '2px' }}>
+                      {currentResource.proctoring.violations.faceMissingCount === 0
+                        ? '✓ Verified In View'
+                        : `⚠️ ${currentResource.proctoring.violations.faceMissingCount} Out-of-view alert(s)`}
+                    </div>
+                  </div>
+
+                  {/* Metric 2: Person Check */}
+                  <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Users size={12} color="#2563EB" /> Single Candidate
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: currentResource.proctoring.violations.multipleFacesCount === 0 ? '#166534' : '#DC2626', marginTop: '2px' }}>
+                      {currentResource.proctoring.violations.multipleFacesCount === 0
+                        ? '✓ Solo Candidate Confirmed'
+                        : `⚠️ ${currentResource.proctoring.violations.multipleFacesCount} Extra person alert(s)`}
+                    </div>
+                  </div>
+
+                  {/* Metric 3: Focus & Tab Switches */}
+                  <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <ShieldCheck size={12} color="#059669" /> Browser Focus
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: currentResource.proctoring.violations.tabSwitchesCount === 0 ? '#166534' : '#DC2626', marginTop: '2px' }}>
+                      {currentResource.proctoring.violations.tabSwitchesCount === 0
+                        ? '✓ Continuous Active Tab'
+                        : `⚠️ ${currentResource.proctoring.violations.tabSwitchesCount} Tab switch(es)`}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Dynamic Question & Answer pairs */}

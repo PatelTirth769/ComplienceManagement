@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FileCheck, Plus, Search, Loader2, Trash2, AlertTriangle, CheckCircle2, FileSpreadsheet, Filter, Eye } from 'lucide-react';
+import { FileCheck, Plus, Search, Loader2, Trash2, AlertTriangle, CheckCircle2, FileSpreadsheet, Filter, Eye, Calendar, Clock } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, updateAuditTimeline } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, parseFlexibleDate } from '../utils/dateUtils';
+import { DateInput } from '../components/DateInput';
 
 export const AdminAudits: React.FC = () => {
   const location = useLocation();
@@ -19,6 +20,13 @@ export const AdminAudits: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Edit Timeline state
+  const [selectedAuditForTimeline, setSelectedAuditForTimeline] = useState<any | null>(null);
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [isUpdatingTimeline, setIsUpdatingTimeline] = useState(false);
+  const [timelineError, setTimelineError] = useState('');
 
   const sidebarItems = getAdminSidebarItems('Audits');
 
@@ -138,6 +146,69 @@ export const AdminAudits: React.FC = () => {
     }
   };
 
+  const handleOpenTimelineModal = (audit: any) => {
+    setSelectedAuditForTimeline(audit);
+    setNewStartDate(audit.startDate || '');
+    setNewDueDate(audit.dueDate || '');
+    setTimelineError('');
+  };
+
+  const handleStartDateChange = (val: string) => {
+    setNewStartDate(val);
+    const sDate = parseFlexibleDate(val);
+    if (sDate) {
+      // Auto-suggest 2-3 days timeline (startDate + 2 days)
+      const dDate = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate() + 2);
+      const mStr = String(dDate.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(dDate.getDate()).padStart(2, '0');
+      setNewDueDate(`${dDate.getFullYear()}-${mStr}-${dayStr}`);
+    }
+  };
+
+  const handleSaveTimeline = async () => {
+    if (!selectedAuditForTimeline) return;
+    if (!newStartDate || !newDueDate) {
+      setTimelineError('Please enter both Scheduled Start Date and Compliance Due Date.');
+      return;
+    }
+    const sDate = parseFlexibleDate(newStartDate);
+    const dDate = parseFlexibleDate(newDueDate);
+    if (!sDate || !dDate) {
+      setTimelineError('Invalid date format.');
+      return;
+    }
+    if (dDate < sDate) {
+      setTimelineError('Due Date cannot be before Start Date.');
+      return;
+    }
+
+    try {
+      setIsUpdatingTimeline(true);
+      setTimelineError('');
+      const res = await updateAuditTimeline(selectedAuditForTimeline.id, newStartDate, newDueDate);
+      if (res && res.success) {
+        setAudits(prev => prev.map(a =>
+          (a.id === selectedAuditForTimeline.id || a.auditIdString === selectedAuditForTimeline.auditIdString)
+            ? { ...a, startDate: newStartDate, dueDate: newDueDate }
+            : a
+        ));
+        setToastMessage({
+          type: 'success',
+          text: `Audit timeline updated to ${formatDate(newStartDate)} - ${formatDate(newDueDate)} & notification email sent to auditor successfully!`
+        });
+        setTimeout(() => setToastMessage(null), 5000);
+        setSelectedAuditForTimeline(null);
+      } else {
+        setTimelineError(res?.error || 'Failed to update timeline.');
+      }
+    } catch (err: any) {
+      console.error('Failed to update timeline:', err);
+      setTimelineError(err.response?.data?.error || err.message || 'Failed to update timeline');
+    } finally {
+      setIsUpdatingTimeline(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const s = (status || '').toLowerCase();
     if (s === 'scheduled') return <span className="db-badge progress"><span className="db-badge-dot"></span> Scheduled</span>;
@@ -155,8 +226,8 @@ export const AdminAudits: React.FC = () => {
   });
 
   const filtered = auditTypeAudits.filter(a => {
-    const matchesSearch = (a.auditIdString || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (a.auditPeriod || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (a.auditIdString || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.auditPeriod || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || (a.status || '').toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
@@ -180,9 +251,8 @@ export const AdminAudits: React.FC = () => {
       </div>
 
       {toastMessage && (
-        <div className={`mb-4 p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 border shadow-sm ${
-          toastMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
+        <div className={`mb-4 p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 border shadow-sm ${toastMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
           <span>{toastMessage.text}</span>
         </div>
@@ -195,7 +265,7 @@ export const AdminAudits: React.FC = () => {
           <div className="flex items-center gap-2">
             <div className="filter-dropdown-wrapper">
               <Filter className="filter-dropdown-icon" />
-              <select 
+              <select
                 className="filter-dropdown-select font-bold"
                 value={auditTypeFilter}
                 onChange={e => setAuditTypeFilter(e.target.value as 'Original' | 'Re-Audit')}
@@ -208,9 +278,9 @@ export const AdminAudits: React.FC = () => {
 
           <div className="search-input-wrapper">
             <Search className="search-input-icon" />
-            <input 
-              type="text" 
-              placeholder="Search by Audit ID, Period..." 
+            <input
+              type="text"
+              placeholder="Search by Audit ID, Period..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -220,7 +290,7 @@ export const AdminAudits: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="filter-dropdown-wrapper">
               <Filter className="filter-dropdown-icon" />
-              <select 
+              <select
                 className="filter-dropdown-select"
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
@@ -293,12 +363,12 @@ export const AdminAudits: React.FC = () => {
                     <tr key={a.id}>
                       <td>
                         {isRe ? (
-                          <span 
-                            className="db-badge" 
-                            style={{ 
-                              backgroundColor: '#F3E8FF', 
-                              color: '#7E22CE', 
-                              border: '1px solid #D8B4FE', 
+                          <span
+                            className="db-badge"
+                            style={{
+                              backgroundColor: '#F3E8FF',
+                              color: '#7E22CE',
+                              border: '1px solid #D8B4FE',
                               fontWeight: 700,
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -313,12 +383,12 @@ export const AdminAudits: React.FC = () => {
                           </span>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                            <span 
-                              className="db-badge" 
-                              style={{ 
-                                backgroundColor: '#ECFDF5', 
-                                color: '#047857', 
-                                border: '1px solid #A7F3D0', 
+                            <span
+                              className="db-badge"
+                              style={{
+                                backgroundColor: '#ECFDF5',
+                                color: '#047857',
+                                border: '1px solid #A7F3D0',
                                 fontWeight: 700,
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -332,13 +402,13 @@ export const AdminAudits: React.FC = () => {
                               Original
                             </span>
                             {a.isReadOnly && (
-                              <span 
-                                className="db-badge" 
-                                style={{ 
-                                  backgroundColor: '#FEF3C7', 
-                                  color: '#92400E', 
-                                  border: '1px solid #FDE68A', 
-                                  fontSize: '0.65rem', 
+                              <span
+                                className="db-badge"
+                                style={{
+                                  backgroundColor: '#FEF3C7',
+                                  color: '#92400E',
+                                  border: '1px solid #FDE68A',
+                                  fontSize: '0.65rem',
                                   padding: '1px 6px',
                                   borderRadius: '4px',
                                   fontWeight: 700,
@@ -357,7 +427,39 @@ export const AdminAudits: React.FC = () => {
                       </td>
                       <td className="font-semibold text-slate-800">{a.auditPeriod}</td>
                       <td className="text-xs font-medium text-slate-600">
-                        {formatDate(a.startDate)} - {formatDate(a.dueDate)}
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ whiteSpace: 'nowrap' }}>{formatDate(a.startDate)} - {formatDate(a.dueDate)}</span>
+                          {(() => {
+                            const stat = (a.status || '').toLowerCase();
+                            const isClosedOrReadOnly = stat === 'closed' || stat === 'completed' || stat === 'approved' || a.isReadOnly === true;
+                            return (
+                              <button
+                                type="button"
+                                disabled={isClosedOrReadOnly}
+                                onClick={isClosedOrReadOnly ? undefined : () => handleOpenTimelineModal(a)}
+                                title={isClosedOrReadOnly ? (a.isReadOnly ? "Audit is Read-Only — timeline cannot be edited" : "Audit is closed — timeline cannot be edited") : "Reschedule Audit Timeline & Notify Auditor"}
+                                style={{
+                                  background: isClosedOrReadOnly ? '#F1F5F9' : '#EFF6FF',
+                                  border: `1px solid ${isClosedOrReadOnly ? '#E2E8F0' : '#BFDBFE'}`,
+                                  borderRadius: '4px',
+                                  padding: '2px 6px',
+                                  cursor: isClosedOrReadOnly ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  color: isClosedOrReadOnly ? '#94A3B8' : '#1D4ED8',
+                                  fontSize: '0.675rem',
+                                  fontWeight: 700,
+                                  lineHeight: 1,
+                                  opacity: isClosedOrReadOnly ? 0.6 : 1
+                                }}
+                              >
+                                <Calendar style={{ width: '11px', height: '11px', color: isClosedOrReadOnly ? '#94A3B8' : '#2563EB' }} />
+                                <span>Edit</span>
+                              </button>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td>{getStatusBadge(a.status)}</td>
                       <td>
@@ -375,9 +477,9 @@ export const AdminAudits: React.FC = () => {
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
                           </Link>
-                          
+
                           {is100Percent ? (
-                            <button 
+                            <button
                               onClick={() => handleDownloadExcel(a)}
                               className="btn-action-excel"
                               title="Download Complete Excel Workbook"
@@ -386,7 +488,7 @@ export const AdminAudits: React.FC = () => {
                               <span>Excel</span>
                             </button>
                           ) : (
-                            <button 
+                            <button
                               disabled
                               className="btn-action-excel"
                               title="Excel download available after audit completion"
@@ -396,7 +498,7 @@ export const AdminAudits: React.FC = () => {
                             </button>
                           )}
 
-                          <button 
+                          <button
                             onClick={() => { setSelectedAuditToDelete(a); setDeleteError(''); }}
                             className="btn-action-delete"
                             title="Delete Audit"
@@ -415,6 +517,152 @@ export const AdminAudits: React.FC = () => {
         </div>
       </div>
 
+      {/* Reschedule Audit Timeline Modal */}
+      {selectedAuditForTimeline && (
+        <div className="modal-overlay" onClick={() => !isUpdatingTimeline && setSelectedAuditForTimeline(null)}>
+          <div className="modal-card" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-icon-badge" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
+                <Clock className="w-6 h-6" />
+              </div>
+              <div className="modal-header-text">
+                <h3 className="modal-title">Reschedule Audit Timeline</h3>
+                <span className="modal-subtitle">Update submission dates and automatically notify auditor</span>
+              </div>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-info-box" style={{ marginBottom: '1.25rem' }}>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Audit ID:</span>
+                  <span className="modal-info-value mono">{selectedAuditForTimeline.auditIdString || selectedAuditForTimeline.id}</span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Period / Target:</span>
+                  <span className="modal-info-value">{selectedAuditForTimeline.auditPeriod || 'N/A'}</span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Vendor:</span>
+                  <span className="modal-info-value">{selectedAuditForTimeline.vendorName || selectedAuditForTimeline.vendorId || 'N/A'}</span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Auditor:</span>
+                  <span className="modal-info-value">{selectedAuditForTimeline.auditorName || selectedAuditForTimeline.auditor || 'Auditor'}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    Scheduled Start Date <span style={{ color: '#DC2626' }}>*</span>
+                  </label>
+                  <DateInput
+                    value={newStartDate}
+                    placeholder="dd-mm-yyyy"
+                    onChange={e => handleStartDateChange(e.target.value)}
+                    disabled={isUpdatingTimeline}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2rem 0.5rem 0.65rem',
+                      fontSize: '0.8125rem',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      backgroundColor: isUpdatingTimeline ? '#F8FAFC' : '#FFFFFF',
+                      color: '#0F172A',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    Compliance Due Date <span style={{ color: '#DC2626' }}>*</span>
+                  </label>
+                  <DateInput
+                    value={newDueDate}
+                    placeholder="dd-mm-yyyy"
+                    onChange={e => setNewDueDate(e.target.value)}
+                    disabled={isUpdatingTimeline}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2rem 0.5rem 0.65rem',
+                      fontSize: '0.8125rem',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      backgroundColor: isUpdatingTimeline ? '#F8FAFC' : '#FFFFFF',
+                      color: '#0F172A',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{
+                background: '#F0FDF4',
+                border: '1px solid #BBF7D0',
+                borderRadius: '6px',
+                padding: '0.625rem 0.85rem',
+                fontSize: '0.75rem',
+                color: '#166534',
+                lineHeight: 1.45
+              }}>
+                📧 <strong>Notification:</strong> When you save, an automated email with the revised timeline will immediately be dispatched to the assigned auditor ({selectedAuditForTimeline.auditorEmail || selectedAuditForTimeline.auditor || 'Auditor'}) and vendor.
+              </div>
+
+              {timelineError && (
+                <div className="modal-error-text mt-3">
+                  {timelineError}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                disabled={isUpdatingTimeline}
+                onClick={() => setSelectedAuditForTimeline(null)}
+                className="btn-cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingTimeline}
+                onClick={handleSaveTimeline}
+                style={{
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.8125rem',
+                  padding: '0.5rem 1.25rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  cursor: isUpdatingTimeline ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+                }}
+              >
+                {isUpdatingTimeline ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Rescheduling & Sending Email...</span>
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    <span>Save & Notify Auditor</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {selectedAuditToDelete && (
         <div className="modal-overlay" onClick={() => !isDeleting && setSelectedAuditToDelete(null)}>
@@ -428,7 +676,7 @@ export const AdminAudits: React.FC = () => {
                 <span className="modal-subtitle">Permanently delete this compliance audit</span>
               </div>
             </div>
-            
+
             <div className="modal-body">
               <p className="text-sm text-slate-600 mb-3 font-medium">
                 Are you sure you want to delete this audit?
@@ -461,14 +709,14 @@ export const AdminAudits: React.FC = () => {
             </div>
 
             <div className="modal-footer">
-              <button 
+              <button
                 disabled={isDeleting}
                 onClick={() => { setSelectedAuditToDelete(null); setDeleteError(''); }}
                 className="btn-cancel"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 disabled={isDeleting}
                 onClick={handleConfirmDelete}
                 className="btn-delete-confirm"

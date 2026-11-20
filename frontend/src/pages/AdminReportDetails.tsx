@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, ClipboardList, BarChart3, Download, Loader2, Scale, X } from 'lucide-react';
+import { FileCheck, LayoutDashboard, Building2, Users, UserCheck, ClipboardList, BarChart3, Download, Loader2, Scale, X, Paperclip } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import { API_BASE_URL } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
 import { formatDate } from '../utils/dateUtils';
-import { findActRule, getDisplayLaw } from '../utils/actLawMatcher';
+import { findActRule, getDisplayLaw, handleLawButtonClick, downloadActRuleAttachment } from '../utils/actLawMatcher';
 
 export const AdminReportDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +13,7 @@ export const AdminReportDetails: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [usersMap, setUsersMap] = useState<Record<string, string>>({});
   const [activeLawModal, setActiveLawModal] = useState<{ item: any; law: any } | null>(null);
+  const [liveRules, setLiveRules] = useState<any[]>([]);
 
   const sidebarItems = getAdminSidebarItems('Reports');
 
@@ -20,13 +21,20 @@ export const AdminReportDetails: React.FC = () => {
     const fetchAuditAndUsers = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        const [auditRes, custRes, vendRes, audRes] = await Promise.all([
+        const [auditRes, custRes, vendRes, audRes, rulesRes] = await Promise.all([
           fetch(`${API_BASE_URL}/admin/audits/${id}`, { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch(`${API_BASE_URL}/admin/users?role=customer`, { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch(`${API_BASE_URL}/admin/users?role=vendor`, { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch(`${API_BASE_URL}/admin/users?role=auditor`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/admin/rules`, { headers: { 'Authorization': `Bearer ${token}` } }).catch(() => null),
         ]);
 
+        if (rulesRes && rulesRes.ok) {
+          const rData = await rulesRes.json().catch(() => null);
+          if (rData?.success && Array.isArray(rData.rules)) {
+            setLiveRules(rData.rules);
+          }
+        }
 
         const auditData = await auditRes.json();
         if (auditData.success) {
@@ -96,10 +104,22 @@ export const AdminReportDetails: React.FC = () => {
   );
   const totalApplicable = audit.totalApplicable ?? summary.applicableItems ?? (compliantCount + nonCompliantCount);
 
-  const actRules: any[] = audit.actRules || [];
-
   const getActLaw = (item: any) => {
-    return findActRule(item, actRules);
+    const raw = findActRule(item, audit.actRules);
+    if (!raw && liveRules.length > 0) {
+      return findActRule(item, liveRules);
+    }
+    if (raw && liveRules.length > 0) {
+      const live = findActRule(item, liveRules);
+      if (live) {
+        return {
+          ...raw,
+          attachment: live.attachment || raw.attachment,
+          description: (live.description && live.description.trim()) ? live.description : raw.description
+        };
+      }
+    }
+    return raw;
   };
 
   return (
@@ -250,6 +270,7 @@ export const AdminReportDetails: React.FC = () => {
                     const itemId = resp.itemId || `ITEM-${idx + 1}`;
                     const matchedLaw = getActLaw(resp);
                     const lawDescription = (matchedLaw?.description || '').trim();
+                    const hasLawRule = Boolean(lawDescription || matchedLaw?.attachment?.fileData);
 
                     return (
                       <tr key={itemId}>
@@ -258,12 +279,18 @@ export const AdminReportDetails: React.FC = () => {
                             <span>{itemId}</span>
                             <button
                               type="button"
-                              className={`badge-law-btn ${lawDescription ? 'has-rule' : ''} no-print`}
+                              className={`badge-law-btn ${hasLawRule ? 'has-rule' : ''} no-print`}
                               onClick={() => {
-                                const lawToDisplay = getDisplayLaw(resp, matchedLaw);
-                                setActiveLawModal({ item: resp, law: lawToDisplay });
+                                handleLawButtonClick(matchedLaw, () => {
+                                  const lawToDisplay = getDisplayLaw(resp, matchedLaw);
+                                  setActiveLawModal({ item: resp, law: lawToDisplay });
+                                });
                               }}
-                              title={`View Law & Statutory Rule for ${matchedLaw?.shortName || resp.type || 'this Act'}`}
+                              title={
+                                !lawDescription && matchedLaw?.attachment?.fileData
+                                  ? `Download Attached Rule Document for ${matchedLaw?.shortName || resp.type || 'this Act'}`
+                                  : `View Law & Statutory Rule for ${matchedLaw?.shortName || resp.type || 'this Act'}`
+                              }
                             >
                               <Scale className="w-3 h-3 mr-1 inline-block" />
                               <span>Law</span>
@@ -331,6 +358,33 @@ export const AdminReportDetails: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {Boolean(activeLawModal.law?.attachment && (activeLawModal.law.attachment.fileData || (activeLawModal.law.attachment as any).fileUrl)) && (
+                <div style={{
+                  marginTop: '0.875rem', padding: '0.75rem 1rem', background: '#F0FDF4',
+                  border: '1px solid #BBF7D0', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                    <Paperclip className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {activeLawModal.law.attachment.fileName || 'Attached Statutory Rule Document'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadActRuleAttachment(activeLawModal.law.attachment)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.35rem 0.75rem', borderRadius: '6px',
+                      background: '#059669', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700,
+                      border: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download
+                  </button>
+                </div>
+              )}
 
               {activeLawModal.law?.states && activeLawModal.law.states.length > 0 && (
                 <div className="law-modal-states">

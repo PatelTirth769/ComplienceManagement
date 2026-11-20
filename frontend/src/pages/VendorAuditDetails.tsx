@@ -5,11 +5,11 @@ import {
   LayoutDashboard, User, FileCheck, FolderOpen, 
   AlertTriangle, Clock, BarChart3, Bell, MessageSquare, 
   ArrowLeft, CheckCircle2, Calendar, Building2, UserCheck, 
-  Hash, Shield, ChevronRight, Info, Scale, X
+  Hash, Shield, ChevronRight, Info, Scale, X, Paperclip, Download
 } from 'lucide-react';
 import { getVendorAuditById } from '../services/api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
-import { findActRule, getDisplayLaw } from '../utils/actLawMatcher';
+import { findActRule, getDisplayLaw, handleLawButtonClick, downloadActRuleAttachment } from '../utils/actLawMatcher';
 
 export const VendorAuditDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -443,6 +443,7 @@ export const VendorAuditDetails: React.FC = () => {
                       const catName = cat.category || cat.section || cat.labourCode || 'General';
                       const matchedLaw = getActLaw(cat);
                       const lawDescription = (matchedLaw?.description || '').trim();
+                      const hasLawRule = Boolean(lawDescription || matchedLaw?.attachment?.fileData);
 
                       return (
                         <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: i % 2 === 0 ? '#FFFFFF' : '#FAFCFF' }}>
@@ -451,12 +452,18 @@ export const VendorAuditDetails: React.FC = () => {
                               <span>{catName}</span>
                               <button
                                 type="button"
-                                className={`badge-law-btn ${lawDescription ? 'has-rule' : ''} no-print`}
+                                className={`badge-law-btn ${hasLawRule ? 'has-rule' : ''} no-print`}
                                 onClick={() => {
-                                  const lawToDisplay = getDisplayLaw(cat, matchedLaw);
-                                  setActiveLawModal({ item: cat, law: lawToDisplay });
+                                  handleLawButtonClick(matchedLaw, () => {
+                                    const lawToDisplay = getDisplayLaw(cat, matchedLaw);
+                                    setActiveLawModal({ item: cat, law: lawToDisplay });
+                                  });
                                 }}
-                                title={`View Law & Statutory Rule for ${matchedLaw?.shortName || catName}`}
+                                title={
+                                  !lawDescription && matchedLaw?.attachment?.fileData
+                                    ? `Download Attached Rule Document for ${matchedLaw?.shortName || catName}`
+                                    : `View Law & Statutory Rule for ${matchedLaw?.shortName || catName}`
+                                }
                               >
                                 <Scale className="w-3 h-3 mr-1 inline-block" />
                                 <span>Law</span>
@@ -615,6 +622,33 @@ export const VendorAuditDetails: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {Boolean(activeLawModal.law?.attachment && (activeLawModal.law.attachment.fileData || (activeLawModal.law.attachment as any).fileUrl)) && (
+                <div style={{
+                  marginTop: '0.875rem', padding: '0.75rem 1rem', background: '#F0FDF4',
+                  border: '1px solid #BBF7D0', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                    <Paperclip className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {activeLawModal.law.attachment.fileName || 'Attached Statutory Rule Document'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadActRuleAttachment(activeLawModal.law.attachment)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.35rem 0.75rem', borderRadius: '6px',
+                      background: '#059669', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700,
+                      border: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download
+                  </button>
+                </div>
+              )}
 
               {activeLawModal.law?.states && activeLawModal.law.states.length > 0 && (
                 <div className="law-modal-states">

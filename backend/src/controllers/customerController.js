@@ -494,18 +494,8 @@ exports.getAuditById = async (req, res) => {
 
     const completionPercentage = excelReportService.getAuditCompletionPercentage(data);
 
-    let actRulesSnapshot = data.actRules;
-    if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
-      if (fs.existsSync(actRulesFilePath)) {
-        try {
-          actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
-        } catch (e) {
-          actRulesSnapshot = [];
-        }
-      } else {
-        actRulesSnapshot = [];
-      }
-    }
+    const { mergeWithLiveActRules } = require('./adminController');
+    const actRulesSnapshot = mergeWithLiveActRules(data.actRules);
 
     res.status(200).json({
       success: true,

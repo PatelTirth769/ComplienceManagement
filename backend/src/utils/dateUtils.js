@@ -155,8 +155,8 @@ function calculateAuditCycle(frequency, year, period) {
     const mNum = String(monthIdx + 1).padStart(2, '0');
     const monthName = AUDIT_MONTHS[monthIdx];
     const startDate = `${y}-${mNum}-01`;
-    const lastDay = new Date(Date.UTC(y, monthIdx + 1, 0)).getUTCDate();
-    const dueDate = `${y}-${mNum}-${String(lastDay).padStart(2, '0')}`;
+    // 2-3 days timeline for vendor to submit documents (1st to 3rd of the month)
+    const dueDate = `${y}-${mNum}-03`;
     const summary = `${monthName} ${y}`;
 
     return {
