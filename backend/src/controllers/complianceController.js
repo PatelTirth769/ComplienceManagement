@@ -772,7 +772,7 @@ async function getDocumentDownloadUrl(req, res, next) {
         }
         if (parentAuditDoc && parentAuditDoc.exists) {
           const pData = parentAuditDoc.data();
-          if (pData && pData.allowAuditorToSeeDocuments !== true) {
+          if (pData && pData.allowAuditorToSeeDocuments !== true && docData.type !== 'CAPA Finding Proof' && !docData.isFindingAttachment) {
             return res.status(403).json({
               success: false,
               error: 'Customer has not enabled auditor document access for this audit.'

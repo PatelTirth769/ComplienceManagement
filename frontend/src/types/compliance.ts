@@ -113,6 +113,21 @@ export interface NonCompliantItemDetail {
   respondedAt?: string;
   actionPlan?: string;
   status?: string;
+  attachmentName?: string;
+  attachmentDocId?: string;
+  attachmentUrl?: string;
+  attachmentType?: string;
+  attachmentSize?: number;
+  attachment?: {
+    id?: string;
+    docId?: string;
+    fileName?: string;
+    fileData?: string;
+    url?: string;
+    fileType?: string;
+    fileSize?: number;
+    uploadedAt?: string;
+  };
 }
 
 export interface CalculationResult {

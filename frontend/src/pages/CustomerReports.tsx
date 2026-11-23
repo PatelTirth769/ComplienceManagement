@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { 
-  LayoutDashboard, Building2, FileCheck, Clock, 
+import {
+  LayoutDashboard, Building2, FileCheck, Clock,
   BarChart3, Bell, Search, Filter, Eye, Download,
   AlertCircle, Shield, FileText, CheckCircle2, AlertTriangle, X, Presentation, FileBarChart, Scale, Paperclip
 } from 'lucide-react';
@@ -684,7 +684,7 @@ export const CustomerReports: React.FC = () => {
               )}
 
               <div className="law-modal-content-card">
-                <div className="law-content-heading">Statutory Rule / Law Mandate:</div>
+                <div className="law-content-heading">Description</div>
                 {activeLawModal.law?.description?.trim() ? (
                   <div className="law-content-text">{activeLawModal.law.description.trim()}</div>
                 ) : (

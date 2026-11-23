@@ -1,10 +1,10 @@
 import React from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  ShieldCheck, 
-  Search, 
-  User as UserIcon, 
+import {
+  ShieldCheck,
+  Search,
+  User as UserIcon,
   LogOut,
   Menu,
   X,
@@ -86,9 +86,9 @@ export const getLogicalParent = (pathname: string, portalTitle?: string): string
   return '';
 };
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ 
-  title, 
-  sidebarItems, 
+export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
+  title,
+  sidebarItems,
   children,
   backUrl,
   backLabel,
@@ -100,11 +100,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const cleanPath = location.pathname.replace(/\/+$/, '') || '/';
-  const isDashboardRoot = 
-    cleanPath === '/admin' || 
-    cleanPath === '/customer' || 
-    cleanPath === '/vendor' || 
-    cleanPath === '/auditor' || 
+  const isDashboardRoot =
+    cleanPath === '/admin' ||
+    cleanPath === '/customer' ||
+    cleanPath === '/vendor' ||
+    cleanPath === '/auditor' ||
     cleanPath === '/';
 
   const targetParent = backUrl || getLogicalParent(location.pathname, title);
@@ -130,14 +130,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <ShieldCheck className="h-6 w-6 text-cyan-400" />
             </div>
             <div className="flex items-center gap-2">
-              <span className="brand-name hidden sm:block">Compliance Platform</span>
-              {title?.toLowerCase().includes('admin') && (
+              <span className="brand-name hidden sm:block">Riskdozer</span>
+              {title?.toLowerCase().includes('admin') ? (
                 <span className="admin-console-badge hidden md:inline-flex">Admin Console</span>
-              )}
+              ) : title?.toLowerCase().includes('customer') ? (
+                <span className="customer-console-badge hidden md:inline-flex">Customer Portal</span>
+              ) : title?.toLowerCase().includes('auditor') ? (
+                <span className="auditor-console-badge hidden md:inline-flex">Auditor Suite</span>
+              ) : title?.toLowerCase().includes('vendor') ? (
+                <span className="vendor-console-badge hidden md:inline-flex">Vendor Portal</span>
+              ) : null}
             </div>
           </div>
         </div>
-        
+
         <div className="header-center hidden md:flex">
           <div className="search-bar">
             <Search className="search-icon" />
@@ -216,7 +222,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
         </main>
       </div>
-      
+
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)}></div>

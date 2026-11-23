@@ -211,7 +211,7 @@ export const ComplianceItemCard: React.FC<ComplianceItemCardProps> = ({ item }) 
               )}
 
               <div className="law-modal-content-card">
-                <div className="law-content-heading">Statutory Rule / Law Mandate:</div>
+                <div className="law-content-heading">Description</div>
                 {lawToDisplay.description?.trim() ? (
                   <div className="law-content-text">{lawToDisplay.description.trim()}</div>
                 ) : (

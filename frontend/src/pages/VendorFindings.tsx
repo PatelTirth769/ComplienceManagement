@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   LayoutDashboard, User, FileCheck, FolderOpen, 
-  AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Send, CheckCircle2, Info, Layers
+  AlertTriangle, Clock, BarChart3, Bell, MessageSquare, Send, CheckCircle2, Info, Layers,
+  Paperclip, FileText, X, Download, ExternalLink, Loader2
 } from 'lucide-react';
-import { getVendorFindings, respondToVendorFinding, getVendorAudits } from '../services/api';
+import { getVendorFindings, respondToVendorFinding, getVendorAudits, getVendorDocumentUrl } from '../services/api';
 import { formatDate } from '../utils/dateUtils';
 
 export const VendorFindings: React.FC = () => {
@@ -13,7 +14,9 @@ export const VendorFindings: React.FC = () => {
   const [audits, setAudits] = useState<any[]>([]);
   const [activeFinding, setActiveFinding] = useState<any>(null);
   const [responseText, setResponseText] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
   const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<string>('ALL');
 
   const sidebarItems = [
@@ -52,11 +55,133 @@ export const VendorFindings: React.FC = () => {
     fetchData();
   }, []);
 
+  const resolveWorkingFileUrl = async (rawUrl: string): Promise<string> => {
+    if (!rawUrl || !rawUrl.startsWith('http')) return rawUrl;
+    try {
+      const headCheck = await fetch(rawUrl, { method: 'HEAD' });
+      if (headCheck.ok) return rawUrl;
+    } catch {
+      // Continue
+    }
+    if (rawUrl.includes('?')) {
+      const cleanUrl = rawUrl.split('?')[0];
+      try {
+        const cleanCheck = await fetch(cleanUrl, { method: 'HEAD' });
+        if (cleanCheck.ok) return cleanUrl;
+      } catch {
+        // Continue
+      }
+    }
+    return rawUrl;
+  };
+
+  const handleViewAttachment = async (docId: string, fileName?: string) => {
+    if (!docId) return;
+    try {
+      setDownloadingDocId(docId);
+      const res = await getVendorDocumentUrl(docId);
+      if (res && res.success) {
+        if (res.isUrl && res.data) {
+          const workingUrl = await resolveWorkingFileUrl(res.data);
+          const win = window.open(workingUrl, '_blank', 'noopener,noreferrer');
+          if (!win || win.closed || typeof win.closed === 'undefined') {
+            const a = document.createElement('a');
+            a.href = workingUrl;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
+        } else if (res.data) {
+          const a = document.createElement('a');
+          a.href = res.data;
+          a.download = res.fileName || fileName || 'resolution_evidence';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          alert('Document file URL or content not found.');
+        }
+      } else {
+        alert(res?.error || 'Could not retrieve document.');
+      }
+    } catch (err: any) {
+      console.error('Error viewing document:', err);
+      alert('Error viewing document: ' + (err.message || 'Network error'));
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
+
+  const handleDownloadAttachment = async (docId: string, fileName?: string) => {
+    if (!docId) return;
+    try {
+      setDownloadingDocId(docId);
+      const res = await getVendorDocumentUrl(docId);
+      if (res && res.success) {
+        if (res.isUrl && res.data) {
+          let workingUrl = await resolveWorkingFileUrl(res.data);
+          let fileResp = await fetch(workingUrl);
+          if (!fileResp.ok && workingUrl.includes('?')) {
+            const cleanUrl = workingUrl.split('?')[0];
+            const retry = await fetch(cleanUrl);
+            if (retry.ok) {
+              fileResp = retry;
+              workingUrl = cleanUrl;
+            }
+          }
+          if (!fileResp.ok) {
+            throw new Error(`Storage returned status ${fileResp.status}`);
+          }
+          const blob = await fileResp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = res.fileName || fileName || 'resolution_evidence';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        } else if (res.data) {
+          const a = document.createElement('a');
+          a.href = res.data;
+          a.download = res.fileName || fileName || 'resolution_evidence';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      } else {
+        alert(res?.error || 'Could not download document.');
+      }
+    } catch (err: any) {
+      console.error('Download error:', err);
+      alert('Error downloading document: ' + (err.message || 'Network error'));
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
+
   const handleSubmitResponse = async () => {
-    if (!activeFinding || !responseText.trim()) return;
+    if (!activeFinding || (!responseText.trim() && !attachmentFile)) return;
     
     setIsSubmitting(true);
     try {
+      let attachmentPayload: any = {};
+      if (attachmentFile) {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(attachmentFile);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+        });
+        attachmentPayload = {
+          attachmentName: attachmentFile.name,
+          attachmentData: base64Data,
+          attachmentType: attachmentFile.type
+        };
+      }
+
       const response = await respondToVendorFinding({
         auditId: activeFinding.auditId,
         findingId: activeFinding.id,
@@ -64,12 +189,14 @@ export const VendorFindings: React.FC = () => {
         itemId: activeFinding.itemId,
         itemCategory: activeFinding.category,
         itemText: activeFinding.item,
-        responseText: responseText.trim()
+        responseText: responseText.trim(),
+        ...attachmentPayload
       });
       
       if (response.success) {
         alert('Corrective action response submitted successfully!');
         setResponseText('');
+        setAttachmentFile(null);
         setActiveFinding(null);
         await fetchData();
       } else {
@@ -77,7 +204,7 @@ export const VendorFindings: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Failed to submit response', error);
-      alert(error.response?.data?.error || 'Failed to submit response');
+      alert(error.response?.data?.error || error.message || 'Failed to submit response');
     } finally {
       setIsSubmitting(false);
     }
@@ -317,7 +444,11 @@ export const VendorFindings: React.FC = () => {
                 return (
                   <div 
                     key={finding.id} 
-                    onClick={() => setActiveFinding(finding)}
+                    onClick={() => {
+                      setActiveFinding(finding);
+                      setAttachmentFile(null);
+                      setResponseText('');
+                    }}
                     style={{
                       padding: '1.25rem 1.5rem', cursor: 'pointer',
                       borderBottom: '1px solid #F1F5F9',
@@ -418,7 +549,67 @@ export const VendorFindings: React.FC = () => {
                     background: '#ECFDF5', borderRadius: '10px', border: '1px solid #A7F3D0',
                     padding: '0.875rem', fontSize: '0.8375rem', color: '#065F46', lineHeight: 1.45
                   }}>
-                    {activeFinding.vendorResponse}
+                    {activeFinding.vendorResponse || 'Corrective action plan submitted.'}
+
+                    {/* Show Submitted Evidence File */}
+                    {activeFinding.attachmentName && (
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #A7F3D0' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.35rem' }}>
+                          Attached Resolution Evidence
+                        </div>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          background: '#FFFFFF', border: '1px solid #A7F3D0', borderRadius: '8px', padding: '0.5rem 0.75rem', gap: '0.5rem'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                            <FileText style={{ width: '16px', height: '16px', color: '#059669', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#065F46', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={activeFinding.attachmentName}>
+                              {activeFinding.attachmentName}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
+                            {activeFinding.attachmentDocId && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewAttachment(activeFinding.attachmentDocId, activeFinding.attachmentName)}
+                                  disabled={downloadingDocId === activeFinding.attachmentDocId}
+                                  style={{
+                                    fontSize: '0.725rem', fontWeight: 700, color: '#1565C0', background: '#EFF6FF',
+                                    border: '1px solid #BFDBFE', padding: '0.2rem 0.55rem', borderRadius: '5px', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '3px'
+                                  }}
+                                >
+                                  {downloadingDocId === activeFinding.attachmentDocId ? (
+                                    <Loader2 style={{ width: '11px', height: '11px', animation: 'spin 1s linear infinite' }} />
+                                  ) : (
+                                    <ExternalLink style={{ width: '11px', height: '11px' }} />
+                                  )}
+                                  <span>View</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadAttachment(activeFinding.attachmentDocId, activeFinding.attachmentName)}
+                                  disabled={downloadingDocId === activeFinding.attachmentDocId}
+                                  style={{
+                                    fontSize: '0.725rem', fontWeight: 700, color: '#047857', background: '#ECFDF5',
+                                    border: '1px solid #A7F3D0', padding: '0.2rem 0.55rem', borderRadius: '5px', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '3px'
+                                  }}
+                                >
+                                  {downloadingDocId === activeFinding.attachmentDocId ? (
+                                    <Loader2 style={{ width: '11px', height: '11px', animation: 'spin 1s linear infinite' }} />
+                                  ) : (
+                                    <Download style={{ width: '11px', height: '11px' }} />
+                                  )}
+                                  <span>Download</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {activeFinding.respondedAt && (
                     <div style={{ fontSize: '0.725rem', color: '#94A3B8', textAlign: 'right', marginTop: '0.375rem' }}>
@@ -435,22 +626,98 @@ export const VendorFindings: React.FC = () => {
                     style={{
                       width: '100%', padding: '0.75rem', borderRadius: '10px',
                       border: '1px solid #CBD5E1', fontSize: '0.8375rem', color: '#0B1F3A',
-                      outline: 'none', height: '110px', resize: 'vertical', marginBottom: '1rem',
+                      outline: 'none', height: '110px', resize: 'vertical', marginBottom: '0.875rem',
                       boxSizing: 'border-box'
                     }}
                     placeholder="Describe your corrective action plan, resolution details, or references to uploaded proof..."
                     value={responseText}
                     onChange={(e) => setResponseText(e.target.value)}
                   />
+
+                  {/* Supporting Document / Resolution Proof Attachment */}
+                  <div style={{ marginBottom: '1.125rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.375rem' }}>
+                      Attach Resolution Proof / Document (Optional)
+                    </label>
+                    
+                    {!attachmentFile ? (
+                      <label
+                        htmlFor="finding-attachment-input"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          padding: '0.65rem 0.85rem', borderRadius: '8px',
+                          border: '1.5px dashed #CBD5E1', backgroundColor: '#F8FAFC',
+                          cursor: 'pointer', transition: 'all 0.2s ease', color: '#1565C0'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#1565C0'; e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#F8FAFC'; }}
+                      >
+                        <Paperclip style={{ width: '16px', height: '16px', color: '#1565C0' }} />
+                        <span style={{ fontSize: '0.8rem', fontWeight: 650, color: '#1E293B' }}>
+                          Choose resolution evidence file
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748B', marginLeft: 'auto' }}>
+                          PDF, PNG, JPG, Excel (Max 5 MB)
+                        </span>
+                        <input
+                          id="finding-attachment-input"
+                          type="file"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('Max file size limit is 5MB');
+                                e.target.value = '';
+                                return;
+                              }
+                              setAttachmentFile(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    ) : (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '0.5rem 0.75rem', borderRadius: '8px',
+                        background: '#F0FDF4', border: '1px solid #BBF7D0'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                          <FileText style={{ width: '16px', height: '16px', color: '#059669', flexShrink: 0 }} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }} title={attachmentFile.name}>
+                              {attachmentFile.name}
+                            </div>
+                            <div style={{ fontSize: '0.675rem', color: '#64748B' }}>
+                              {(attachmentFile.size / 1024).toFixed(1)} KB
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAttachmentFile(null);
+                            const input = document.getElementById('finding-attachment-input') as HTMLInputElement;
+                            if (input) input.value = '';
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#DC2626' }}
+                          title="Remove file"
+                        >
+                          <X style={{ width: '14px', height: '14px' }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <button 
                     onClick={handleSubmitResponse}
-                    disabled={isSubmitting || !responseText.trim()}
+                    disabled={isSubmitting || (!responseText.trim() && !attachmentFile)}
                     style={{
                       width: '100%', padding: '0.75rem 1rem', borderRadius: '10px',
-                      background: isSubmitting || !responseText.trim() ? '#CBD5E1' : 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)',
+                      background: isSubmitting || (!responseText.trim() && !attachmentFile) ? '#CBD5E1' : 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)',
                       color: 'white', fontWeight: 700, fontSize: '0.9rem',
-                      border: 'none', cursor: isSubmitting || !responseText.trim() ? 'not-allowed' : 'pointer',
-                      boxShadow: responseText.trim() && !isSubmitting ? '0 4px 12px rgba(21, 101, 192, 0.25)' : 'none',
+                      border: 'none', cursor: isSubmitting || (!responseText.trim() && !attachmentFile) ? 'not-allowed' : 'pointer',
+                      boxShadow: (responseText.trim() || attachmentFile) && !isSubmitting ? '0 4px 12px rgba(21, 101, 192, 0.25)' : 'none',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
                       transition: 'all 0.2s ease'
                     }}

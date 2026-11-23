@@ -110,11 +110,9 @@ export const AdminAudits: React.FC = () => {
         const deletedStrings = new Set<string>(data.deletedIdStrings || [selectedAuditToDelete.auditIdString]);
         const baseAuditString = data.baseAuditIdString || (selectedAuditToDelete.auditIdString || '').replace(/-RA\d*$/, '');
 
-        // Immediately remove all matching original and re-audits from local table state
+        // Immediately remove all matching original and re-audits from local table state by document ID
         setAudits(prev => prev.filter(a => {
           if (deletedIds.has(a.id)) return false;
-          if (a.auditIdString && deletedStrings.has(a.auditIdString)) return false;
-          if (baseAuditString && (a.auditIdString || '').replace(/-RA\d*$/, '') === baseAuditString) return false;
           if (a.parentAuditId && deletedIds.has(a.parentAuditId)) return false;
           if (a.originalAuditId && deletedIds.has(a.originalAuditId)) return false;
           return true;
@@ -128,9 +126,7 @@ export const AdminAudits: React.FC = () => {
         if (data.error === 'Audit not found') {
           // If audit was already deleted from DB, clean it up from table immediately
           const targetId = selectedAuditToDelete.id;
-          const targetStr = selectedAuditToDelete.auditIdString || '';
-          const baseStr = targetStr.replace(/-RA\d*$/, '');
-          setAudits(prev => prev.filter(a => a.id !== targetId && a.auditIdString !== targetStr && (a.auditIdString || '').replace(/-RA\d*$/, '') !== baseStr));
+          setAudits(prev => prev.filter(a => a.id !== targetId));
           setSelectedAuditToDelete(null);
           setToastMessage({ type: 'success', text: 'Audit record cleared.' });
           setTimeout(() => setToastMessage(null), 4000);

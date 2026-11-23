@@ -481,7 +481,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const respMap = new Map();
           existingNonComp.forEach((nc: any) => {
             const key = nc.itemId || nc.id;
-            if (key && nc.vendorResponse) {
+            if (key && (nc.vendorResponse || nc.attachmentName || nc.attachmentDocId || nc.attachment)) {
               respMap.set(key, nc);
             }
           });
@@ -495,7 +495,13 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 vendorResponse: prev.vendorResponse,
                 respondedAt: prev.respondedAt,
                 actionPlan: prev.actionPlan,
-                status: prev.status
+                status: prev.status,
+                attachmentName: prev.attachmentName,
+                attachmentDocId: prev.attachmentDocId,
+                attachmentUrl: prev.attachmentUrl,
+                attachmentType: prev.attachmentType,
+                attachmentSize: prev.attachmentSize,
+                attachment: prev.attachment
               };
             }
             return nc;

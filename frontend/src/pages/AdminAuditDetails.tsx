@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { Loader2, CheckCircle2, Circle, FileText, Calendar, Clock } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle, FileText, Calendar, Clock, Eye, Download, Paperclip } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
-import { API_BASE_URL, updateAuditTimeline } from '../services/api';
+import { API_BASE_URL, updateAuditTimeline, getAuditDocumentUrl } from '../services/api';
 import { getAdminSidebarItems } from '../utils/adminNavigation';
 import { formatDate, parseFlexibleDate } from '../utils/dateUtils';
 import { DateInput } from '../components/DateInput';
@@ -20,6 +20,156 @@ export const AdminAuditDetails: React.FC = () => {
   const [isUpdatingTimeline, setIsUpdatingTimeline] = useState(false);
   const [timelineError, setTimelineError] = useState('');
   const [timelineSuccessMsg, setTimelineSuccessMsg] = useState('');
+  const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
+
+  const resolveWorkingFileUrl = async (rawUrl: string): Promise<string> => {
+    if (!rawUrl || !rawUrl.startsWith('http')) return rawUrl;
+    try {
+      const headCheck = await fetch(rawUrl, { method: 'HEAD' });
+      if (headCheck.ok) return rawUrl;
+    } catch {
+      // Continue
+    }
+    if (rawUrl.includes('?')) {
+      const cleanUrl = rawUrl.split('?')[0];
+      try {
+        const cleanCheck = await fetch(cleanUrl, { method: 'HEAD' });
+        if (cleanCheck.ok) return cleanUrl;
+      } catch {
+        // Continue
+      }
+    }
+    return rawUrl;
+  };
+
+  const handleViewAttachment = async (docId?: string, fallbackData?: string, fileName?: string) => {
+    if (!docId && !fallbackData) return;
+    const trackId = docId || fileName || 'view';
+    try {
+      setDownloadingDocId(trackId);
+      if (docId) {
+        const res = await getAuditDocumentUrl(docId);
+        if (res && res.success) {
+          if (res.isUrl && res.data) {
+            const workingUrl = await resolveWorkingFileUrl(res.data);
+            const win = window.open(workingUrl, '_blank', 'noopener,noreferrer');
+            if (!win || win.closed || typeof win.closed === 'undefined') {
+              const a = document.createElement('a');
+              a.href = workingUrl;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }
+            return;
+          } else if (res.data) {
+            const a = document.createElement('a');
+            a.href = res.data;
+            a.download = res.fileName || fileName || 'resolution_evidence';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            return;
+          }
+        }
+      }
+
+      if (fallbackData) {
+        if (fallbackData.startsWith('http')) {
+          const workingUrl = await resolveWorkingFileUrl(fallbackData);
+          window.open(workingUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          const a = document.createElement('a');
+          a.href = fallbackData;
+          a.download = fileName || 'resolution_evidence';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      } else {
+        alert('Document file URL or content not found.');
+      }
+    } catch (err: any) {
+      console.error('Error viewing document:', err);
+      alert('Error viewing document: ' + (err.message || 'Network error'));
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
+
+  const handleDownloadAttachment = async (docId?: string, fallbackData?: string, fileName?: string) => {
+    if (!docId && !fallbackData) return;
+    const trackId = docId || fileName || 'download';
+    try {
+      setDownloadingDocId(trackId);
+      if (docId) {
+        const res = await getAuditDocumentUrl(docId);
+        if (res && res.success) {
+          if (res.isUrl && res.data) {
+            let workingUrl = await resolveWorkingFileUrl(res.data);
+            let fileResp = await fetch(workingUrl);
+            if (!fileResp.ok && workingUrl.includes('?')) {
+              const cleanUrl = workingUrl.split('?')[0];
+              const retry = await fetch(cleanUrl);
+              if (retry.ok) {
+                fileResp = retry;
+                workingUrl = cleanUrl;
+              }
+            }
+            if (!fileResp.ok) {
+              throw new Error(`Storage returned status ${fileResp.status}`);
+            }
+            const blob = await fileResp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = res.fileName || fileName || 'resolution_evidence';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+            return;
+          } else if (res.data) {
+            const a = document.createElement('a');
+            a.href = res.data;
+            a.download = res.fileName || fileName || 'resolution_evidence';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            return;
+          }
+        }
+      }
+
+      if (fallbackData) {
+        if (fallbackData.startsWith('http')) {
+          const resp = await fetch(fallbackData);
+          const blob = await resp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = fileName || 'resolution_evidence';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        } else {
+          const a = document.createElement('a');
+          a.href = fallbackData;
+          a.download = fileName || 'resolution_evidence';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      }
+    } catch (err: any) {
+      console.error('Download error:', err);
+      alert('Error downloading document: ' + (err.message || 'Network error'));
+    } finally {
+      setDownloadingDocId(null);
+    }
+  };
 
   const sidebarItems = getAdminSidebarItems('Audits');
 
@@ -475,10 +625,12 @@ export const AdminAuditDetails: React.FC = () => {
                                     </div>
                                   </td>
                                   <td>
-                                    {f.vendorResponse ? (
+                                    {f.vendorResponse || f.attachmentName || f.attachmentDocId || f.attachment ? (
                                       <div className="finding-response-box">
-                                        <div style={{ fontWeight: 700, color: '#0F172A' }}>{f.vendorResponse}</div>
-                                        {f.actionPlan && (
+                                        {f.vendorResponse && (
+                                          <div style={{ fontWeight: 700, color: '#0F172A' }}>{f.vendorResponse}</div>
+                                        )}
+                                        {f.actionPlan && f.actionPlan !== f.vendorResponse && (
                                           <div style={{ color: '#64748B', fontSize: '0.7rem', marginTop: '2px' }}>
                                             Action Plan: {f.actionPlan}
                                           </div>
@@ -486,6 +638,40 @@ export const AdminAuditDetails: React.FC = () => {
                                         {f.respondedAt && (
                                           <div style={{ color: '#94A3B8', fontSize: '0.675rem', marginTop: '2px' }}>
                                             Responded: {formatDate(f.respondedAt)}
+                                          </div>
+                                        )}
+                                        {(f.attachmentName || f.attachmentDocId || f.attachment) && (
+                                          <div style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                            background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '6px',
+                                            padding: '0.35rem 0.5rem', marginTop: '0.4rem', gap: '0.5rem'
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                                              <FileText style={{ width: '13px', height: '13px', color: '#059669', flexShrink: 0 }} />
+                                              <span style={{ fontSize: '0.725rem', fontWeight: 600, color: '#065F46', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }} title={f.attachmentName || f.attachment?.fileName || 'Attached Proof'}>
+                                                {f.attachmentName || f.attachment?.fileName || 'Attached Proof'}
+                                              </span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleViewAttachment(f.attachmentDocId || f.attachment?.id || f.attachment?.docId, f.attachmentUrl || f.attachment?.url || f.attachment?.fileData, f.attachmentName || f.attachment?.fileName)}
+                                                disabled={downloadingDocId === (f.attachmentDocId || f.attachmentName || 'view')}
+                                                style={{ fontSize: '0.675rem', fontWeight: 700, color: '#1565C0', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.15rem 0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                                              >
+                                                <Eye style={{ width: '10px', height: '10px' }} />
+                                                <span>View</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDownloadAttachment(f.attachmentDocId || f.attachment?.id || f.attachment?.docId, f.attachmentUrl || f.attachment?.url || f.attachment?.fileData, f.attachmentName || f.attachment?.fileName)}
+                                                disabled={downloadingDocId === (f.attachmentDocId || f.attachmentName || 'download')}
+                                                style={{ fontSize: '0.675rem', fontWeight: 700, color: '#047857', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '0.15rem 0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                                              >
+                                                <Download style={{ width: '10px', height: '10px' }} />
+                                                <span>Download</span>
+                                              </button>
+                                            </div>
                                           </div>
                                         )}
                                       </div>

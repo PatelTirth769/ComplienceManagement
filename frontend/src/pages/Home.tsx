@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ShieldCheck, 
-  BarChart3, 
-  Activity, 
-  Users, 
-  ArrowRight, 
-  Menu, 
-  X, 
-  CheckCircle2, 
-  AlertTriangle, 
-  FileText, 
-  Lock, 
-  Building2, 
-  UserCheck, 
-  Layers, 
-  Sparkles, 
+import {
+  ShieldCheck,
+  BarChart3,
+  Activity,
+  Users,
+  ArrowRight,
+  Menu,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  Lock,
+  Building2,
+  UserCheck,
+  Layers,
+  Sparkles,
   Clock,
   ArrowUpRight,
   TrendingUp,
@@ -115,13 +115,13 @@ export const Home: React.FC = () => {
             </div>
             <div className="brand-text">
               <div className="brand-title-row">
-                <h1 className="brand-title">ComplianceOS</h1>
+                <h1 className="brand-title">Riskdozer</h1>
                 <span className="brand-version-badge">v2.4 PRO</span>
               </div>
               <span className="brand-subtitle">Enterprise Audit & Risk Governance</span>
             </div>
           </div>
-          
+
           {/* Desktop Navigation */}
           <div className="nav-actions">
             <button className="nav-btn" onClick={() => navigate('/login/admin')}>
@@ -144,7 +144,7 @@ export const Home: React.FC = () => {
           </div>
 
           {/* Mobile Menu Toggle */}
-          <button 
+          <button
             className="mobile-menu-btn"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
@@ -176,7 +176,7 @@ export const Home: React.FC = () => {
       <section className="hero-section">
         <div className="hero-glow-sphere sphere-1"></div>
         <div className="hero-glow-sphere sphere-2"></div>
-        
+
         <div className="hero-content">
           <div className="hero-text-column">
             <div className="hero-badge">
@@ -205,7 +205,7 @@ export const Home: React.FC = () => {
                 Explore Role Portals
               </button>
             </div>
-            
+
             <div className="hero-stats-strip">
               <div className="stat-card">
                 <span className="stat-number">99.8%</span>
@@ -223,107 +223,145 @@ export const Home: React.FC = () => {
               </div>
             </div>
           </div>
-          
-          {/* Production Mockup Dashboard */}
+
+          {/* Unique Riskdozer Holographic Governance Hub */}
           <div className="hero-visual-column">
-            <div className="mockup-frame">
-              {/* Window Bar */}
-              <div className="mockup-header">
-                <div className="mockup-controls">
-                  <span className="mockup-dot dot-red"></span>
-                  <span className="mockup-dot dot-yellow"></span>
-                  <span className="mockup-dot dot-green"></span>
+            <div className="riskdozer-matrix-wrapper">
+              {/* Ambient Glow Aura */}
+              <div className="matrix-glow-aura"></div>
+
+              {/* Satellite Card: Top-Right (Multi-Party Role Sync) */}
+              <div className="satellite-card sat-top-right">
+                <div className="sat-icon-wrap sat-blue">
+                  <Users size={16} />
                 </div>
-                <div className="mockup-url-bar">
-                  <Lock size={12} className="url-lock" />
-                  <span>app.complianceos.enterprise/audit/live-session</span>
+                <div className="sat-text">
+                  <div className="sat-title">4-Way Role Sync</div>
+                  <div className="sat-sub">Admin • Client • Auditor • Vendor</div>
                 </div>
-                <div className="mockup-status-live">
-                  <span className="live-pulse"></span>
-                  <span>LIVE AUDIT</span>
+                <span className="sat-badge-live">
+                  <span className="pulse-dot-green"></span> Live
+                </span>
+              </div>
+
+              {/* Satellite Card: Top-Left (Zero-Trust Security) */}
+              <div className="satellite-card sat-top-left">
+                <div className="sat-icon-wrap sat-cyan">
+                  <Lock size={15} />
+                </div>
+                <div className="sat-text">
+                  <div className="sat-title">Tamper-Proof Audit</div>
+                  <div className="sat-sub">Geotagged & Encrypted</div>
                 </div>
               </div>
 
-              {/* Mockup Body */}
-              <div className="mockup-body">
-                {/* Metric Summary Bar */}
-                <div className="mockup-top-metrics">
-                  <div className="metric-pill">
-                    <span className="metric-label">Assigned Audit</span>
-                    <strong className="metric-val">Q3 Statutory - Tata Motors</strong>
-                  </div>
-                  <div className="metric-pill highlight">
-                    <span className="metric-label">Compliance Score</span>
-                    <div className="score-display">
-                      <span className="score-num">94.8%</span>
-                      <span className="score-grade">High Assurance</span>
+              {/* Central Riskdozer Governance Hub */}
+              <div className="riskdozer-core-hub">
+                {/* Hub Header */}
+                <div className="hub-header">
+                  <div className="hub-brand-block">
+                    <div className="hub-shield-icon">
+                      <ShieldCheck size={24} className="text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="hub-brand-title">Riskdozer Core Engine</div>
+                      <div className="hub-brand-sub">Continuous Compliance & Risk Telemetry</div>
                     </div>
                   </div>
-                  <div className="metric-pill">
-                    <span className="metric-label">Status</span>
-                    <span className="status-badge-live">In Progress</span>
+                  <div className="hub-status-pill">
+                    <span className="pulse-dot-green"></span>
+                    <span>Zero Penalty Risk</span>
                   </div>
                 </div>
 
-                {/* Score Progress Overview */}
-                <div className="mockup-progress-card">
-                  <div className="progress-card-header">
-                    <div className="progress-title-wrap">
-                      <BarChart3 size={16} className="text-cyan-400" />
-                      <span>Statutory Domain Execution Progress</span>
+                {/* Central Radial Score & Risk Dial */}
+                <div className="hub-dial-section">
+                  <div className="dial-container">
+                    <svg className="dial-svg" viewBox="0 0 160 160">
+                      <circle
+                        className="dial-bg-circle"
+                        cx="80"
+                        cy="80"
+                        r="66"
+                      />
+                      <circle
+                        className="dial-progress-circle"
+                        cx="80"
+                        cy="80"
+                        r="66"
+                        strokeDasharray="414.69"
+                        strokeDashoffset="24.88"
+                      />
+                    </svg>
+                    <div className="dial-content">
+                      <span className="dial-number">98.8%</span>
+                      <span className="dial-label">Health Score</span>
+                      <span className="dial-tier">Tier-1 Compliant</span>
                     </div>
-                    <span className="progress-fraction">38 / 40 Verified</span>
                   </div>
-                  <div className="progress-track-bg">
-                    <div className="progress-track-fill" style={{ width: '95%' }}></div>
+
+                  {/* Micro Performance Metrics */}
+                  <div className="dial-stats-grid">
+                    <div className="dial-stat-card">
+                      <span className="stat-card-label">Statutory Coverage</span>
+                      <strong className="stat-card-value text-emerald-600">44 Acts Verified</strong>
+                      <span className="stat-card-sub">Central & State Rules</span>
+                    </div>
+                    <div className="dial-stat-card">
+                      <span className="stat-card-label">CAPA Resolution</span>
+                      <strong className="stat-card-value text-blue-600">100% On-Time</strong>
+                      <span className="stat-card-sub">Zero Overdue Items</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Simulated Audit Checklist Items */}
-                <div className="mockup-checklist-preview">
-                  <div className="checklist-preview-header">
-                    <span>Field Checklist Snapshot</span>
-                    <span className="checklist-sub">Real-time Auditor Feed</span>
-                  </div>
-
-                  <div className="checklist-item success">
-                    <div className="check-icon-wrap">
-                      <CheckCircle2 size={16} />
+                {/* Live Synchronized Portals Strip */}
+                <div className="hub-portals-strip">
+                  <span className="portals-strip-label">Integrated Portals</span>
+                  <div className="portals-nodes-row">
+                    <div className="portal-node">
+                      <span className="node-dot dot-admin"></span>
+                      <span>Admin</span>
                     </div>
-                    <div className="check-info">
-                      <div className="check-title">EPF Electronic Challan & ECR Filing</div>
-                      <div className="check-meta">Section 6, EPF Act 1952 • Challan verified with TRRN</div>
+                    <div className="node-connector"></div>
+                    <div className="portal-node">
+                      <span className="node-dot dot-customer"></span>
+                      <span>Client</span>
                     </div>
-                    <div className="check-status status-compliant">Compliant (100%)</div>
-                  </div>
-
-                  <div className="checklist-item success">
-                    <div className="check-icon-wrap">
-                      <CheckCircle2 size={16} />
+                    <div className="node-connector"></div>
+                    <div className="portal-node">
+                      <span className="node-dot dot-auditor"></span>
+                      <span>Auditor</span>
                     </div>
-                    <div className="check-info">
-                      <div className="check-title">Contract Labour Form XII Register of Contractors</div>
-                      <div className="check-meta">Rule 74, CLRA Central Rules • Up to date with photo proof</div>
+                    <div className="node-connector"></div>
+                    <div className="portal-node">
+                      <span className="node-dot dot-vendor"></span>
+                      <span>Auditee</span>
                     </div>
-                    <div className="check-status status-compliant">Compliant (100%)</div>
-                  </div>
-
-                  <div className="checklist-item warning">
-                    <div className="check-icon-wrap">
-                      <AlertTriangle size={16} />
-                    </div>
-                    <div className="check-info">
-                      <div className="check-title">Factory First Aid Box & Trained Personnel Cert</div>
-                      <div className="check-meta">Section 45, Factories Act • Form 11 certificate expired</div>
-                    </div>
-                    <div className="check-status status-action">Action Required</div>
                   </div>
                 </div>
+              </div>
 
-                {/* Floating Notification Snippet */}
-                <div className="mockup-floating-banner">
-                  <Clock size={14} className="text-cyan-400" />
-                  <span>Real-time calculation enabled: <strong>Weighted Auto-Formula Active</strong></span>
+              {/* Satellite Card: Bottom-Left (Statutory Rules) */}
+              <div className="satellite-card sat-bottom-left">
+                <div className="sat-icon-wrap sat-emerald">
+                  <FileCheck size={16} />
+                </div>
+                <div className="sat-text">
+                  <div className="sat-title">Auto-Score Formulas</div>
+                  <div className="sat-sub">Weighted Legal Scoring Active</div>
+                </div>
+                <span className="sat-badge-check">Verified</span>
+              </div>
+
+              {/* Satellite Card: Bottom-Right (Active SLA) */}
+              <div className="satellite-card sat-bottom-right">
+                <div className="sat-icon-wrap sat-amber">
+                  <Activity size={16} />
+                </div>
+                <div className="sat-text">
+                  <div className="sat-title">Audit SLA: 0 Breaches</div>
+                  <div className="sat-sub">Continuous Monitoring</div>
                 </div>
               </div>
             </div>
@@ -361,8 +399,8 @@ export const Home: React.FC = () => {
 
           <div className="portals-grid">
             {portals.map((portal, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`portal-card ${portal.highlight ? 'portal-card-highlight' : ''}`}
                 onClick={() => navigate(portal.path)}
               >
@@ -445,7 +483,7 @@ export const Home: React.FC = () => {
                 <ShieldCheck className="brand-icon" />
               </div>
               <div className="brand-text">
-                <span className="brand-title">ComplianceOS</span>
+                <span className="brand-title">Riskdozer</span>
                 <span className="brand-subtitle">Enterprise Audit Platform</span>
               </div>
             </div>
@@ -485,7 +523,7 @@ export const Home: React.FC = () => {
 
         <div className="footer-bottom">
           <div className="section-container footer-bottom-inner">
-            <span>© {new Date().getFullYear()} ComplianceOS Enterprise. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Riskdozer Enterprise. All rights reserved.</span>
             <span>Statutory Audit & Labor Governance Suite</span>
           </div>
         </div>

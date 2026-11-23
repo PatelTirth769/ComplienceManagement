@@ -227,10 +227,14 @@
 }
 
 .portal-badge-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #64748B;
-  margin-bottom: 0.4rem;
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.28rem 0.85rem;
+  border-radius: 9999px;
+  margin-bottom: 0.6rem;
 }
 
 .form-title {
@@ -478,7 +482,9 @@
 }
 
 @keyframes authSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Bottom Footer Link */
@@ -525,11 +531,428 @@
 
 /* Suppress Chrome/Edge Autofill Yellow/Blue Tint */
 .auth-form input:-webkit-autofill,
-.auth-form input:-webkit-autofill:hover, 
-.auth-form input:-webkit-autofill:focus, 
+.auth-form input:-webkit-autofill:hover,
+.auth-form input:-webkit-autofill:focus,
 .auth-form input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 40px #FFFFFF inset !important;
   -webkit-text-fill-color: #0F172A !important;
   transition: background-color 5000s ease-in-out 0s;
 }
 
+/* ==========================================================================
+   ROLE-SPECIFIC PREVIEW WIDGET & PORTAL THEMES (Admin, Customer, Auditor, Vendor)
+   ========================================================================== */
+
+/* Role Preview Widget inside branding-hero-block */
+.role-preview-widget {
+  margin-top: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 8px;
+}
+
+.preview-widget-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.preview-widget-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  letter-spacing: 0.03em;
+}
+
+.preview-widget-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  text-align: center;
+}
+
+.preview-metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.preview-metric-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.preview-metric-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* 1. ADMIN THEME (Preserved Classic Corporate Royal Blue) */
+.auth-role-admin .auth-branding {
+  background: linear-gradient(175deg, #003B95 0%, #002257 100%);
+}
+
+.auth-role-admin .branding-logo {
+  color: #38BDF8;
+}
+
+.auth-role-admin .widget-admin {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(56, 189, 248, 0.28);
+}
+
+.auth-role-admin .widget-admin .preview-widget-badge {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7DD3FC;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.auth-role-admin .widget-admin .preview-metric-val {
+  color: #38BDF8;
+}
+
+.auth-role-admin .portal-badge-label {
+  background: rgba(11, 99, 229, 0.08);
+  color: #0B63E5;
+  border: 1px solid rgba(11, 99, 229, 0.2);
+}
+
+.auth-role-admin .auth-tab-btn.active {
+  background: #0B63E5;
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(11, 99, 229, 0.25);
+}
+
+.auth-role-admin .auth-submit-btn {
+  background: #0B63E5;
+  box-shadow: 0 4px 10px rgba(11, 99, 229, 0.25);
+}
+
+.auth-role-admin .auth-submit-btn:hover:not(:disabled) {
+  background: #0852C0;
+}
+
+.auth-role-admin .input-wrapper input:focus {
+  border-color: #0B63E5;
+  box-shadow: 0 0 0 3px rgba(11, 99, 229, 0.12);
+}
+
+/* 2. CUSTOMER THEME (Deep Midnight Obsidian + Radiant Jade Glow) */
+.auth-role-customer .auth-branding {
+  background-image: radial-gradient(circle at 85% 15%, rgba(16, 185, 129, 0.24) 0%, transparent 60%),
+                    linear-gradient(175deg, #072922 0%, #031814 55%, #010B09 100%);
+  background-color: #031814;
+}
+
+.auth-role-customer .branding-logo {
+  color: #34D399;
+}
+
+.auth-role-customer .branding-headline {
+  color: #FFFFFF;
+}
+
+.auth-role-customer .branding-description {
+  color: #A7F3D0;
+}
+
+.auth-role-customer .widget-customer {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.auth-role-customer .widget-customer .preview-widget-badge {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6EE7B7;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.auth-role-customer .widget-customer .preview-metric-val {
+  color: #34D399;
+}
+
+.auth-role-customer .branding-footer-card {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.auth-role-customer .security-badge-icon {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34D399;
+}
+
+.auth-role-customer .portal-badge-label {
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+.auth-role-customer .auth-back-btn:hover {
+  color: #059669;
+  background-color: rgba(5, 150, 105, 0.08);
+}
+
+.auth-role-customer .auth-tab-btn {
+  color: #059669;
+}
+
+.auth-role-customer .auth-tab-btn:hover:not(.active) {
+  background: rgba(5, 150, 105, 0.06);
+}
+
+.auth-role-customer .auth-tab-btn.active {
+  background: #059669;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.auth-role-customer .auth-submit-btn {
+  background: #059669;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.auth-role-customer .auth-submit-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.auth-role-customer .forgot-password-link {
+  color: #059669;
+}
+
+.auth-role-customer .forgot-password-link:hover {
+  color: #047857;
+}
+
+.auth-role-customer .toggle-link {
+  color: #059669;
+}
+
+.auth-role-customer .toggle-link:hover {
+  color: #047857;
+}
+
+.auth-role-customer .input-wrapper input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+/* 3. AUDITOR THEME (Deep Indigo Midnight + Radiant Electric Cyan Glow) */
+.auth-role-auditor .auth-branding {
+  background-image: radial-gradient(circle at 85% 15%, rgba(14, 165, 233, 0.26) 0%, transparent 60%),
+                    linear-gradient(175deg, #0A2444 0%, #06172D 55%, #020A14 100%);
+  background-color: #06172D;
+}
+
+.auth-role-auditor .branding-logo {
+  color: #38BDF8;
+}
+
+.auth-role-auditor .branding-headline {
+  color: #FFFFFF;
+}
+
+.auth-role-auditor .branding-description {
+  color: #BAE6FD;
+}
+
+.auth-role-auditor .widget-auditor {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.auth-role-auditor .widget-auditor .preview-widget-badge {
+  background: rgba(14, 165, 233, 0.2);
+  color: #7DD3FC;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.auth-role-auditor .widget-auditor .preview-metric-val {
+  color: #38BDF8;
+}
+
+.auth-role-auditor .branding-footer-card {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.auth-role-auditor .security-badge-icon {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38BDF8;
+}
+
+.auth-role-auditor .portal-badge-label {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284C7;
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.auth-role-auditor .auth-back-btn:hover {
+  color: #0284C7;
+  background-color: rgba(2, 132, 199, 0.08);
+}
+
+.auth-role-auditor .auth-tab-btn {
+  color: #0284C7;
+}
+
+.auth-role-auditor .auth-tab-btn:hover:not(.active) {
+  background: rgba(2, 132, 199, 0.06);
+}
+
+.auth-role-auditor .auth-tab-btn.active {
+  background: #0284C7;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.auth-role-auditor .auth-submit-btn {
+  background: #0284C7;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.auth-role-auditor .auth-submit-btn:hover:not(:disabled) {
+  background: #0369A1;
+}
+
+.auth-role-auditor .forgot-password-link {
+  color: #0284C7;
+}
+
+.auth-role-auditor .forgot-password-link:hover {
+  color: #0369A1;
+}
+
+.auth-role-auditor .toggle-link {
+  color: #0284C7;
+}
+
+.auth-role-auditor .toggle-link:hover {
+  color: #0369A1;
+}
+
+.auth-role-auditor .input-wrapper input:focus {
+  border-color: #0284C7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+/* 4. VENDOR THEME (Deep Onyx Midnight + Radiant Amber Gold Glow) */
+.auth-role-vendor .auth-branding {
+  background-image: radial-gradient(circle at 85% 15%, rgba(245, 158, 11, 0.22) 0%, transparent 60%),
+                    linear-gradient(175deg, #1C150A 0%, #120D05 55%, #080502 100%);
+  background-color: #120D05;
+}
+
+.auth-role-vendor .branding-logo {
+  color: #FBBF24;
+}
+
+.auth-role-vendor .branding-headline {
+  color: #FFFFFF;
+}
+
+.auth-role-vendor .branding-description {
+  color: #FDE68A;
+}
+
+.auth-role-vendor .widget-vendor {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.auth-role-vendor .widget-vendor .preview-widget-badge {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FCD34D;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.auth-role-vendor .widget-vendor .preview-metric-val {
+  color: #FBBF24;
+}
+
+.auth-role-vendor .branding-footer-card {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+.auth-role-vendor .security-badge-icon {
+  background: rgba(251, 191, 36, 0.18);
+  color: #FBBF24;
+}
+
+.auth-role-vendor .portal-badge-label {
+  background: rgba(217, 119, 6, 0.1);
+  color: #D97706;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
+.auth-role-vendor .auth-back-btn:hover {
+  color: #D97706;
+  background-color: rgba(217, 119, 6, 0.08);
+}
+
+.auth-role-vendor .auth-tab-btn {
+  color: #D97706;
+}
+
+.auth-role-vendor .auth-tab-btn:hover:not(.active) {
+  background: rgba(217, 119, 6, 0.06);
+}
+
+.auth-role-vendor .auth-tab-btn.active {
+  background: #D97706;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+}
+
+.auth-role-vendor .auth-submit-btn {
+  background: #D97706;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+}
+
+.auth-role-vendor .auth-submit-btn:hover:not(:disabled) {
+  background: #B45309;
+}
+
+.auth-role-vendor .forgot-password-link {
+  color: #D97706;
+}
+
+.auth-role-vendor .forgot-password-link:hover {
+  color: #B45309;
+}
+
+.auth-role-vendor .toggle-link {
+  color: #D97706;
+}
+
+.auth-role-vendor .toggle-link:hover {
+  color: #B45309;
+}
+
+.auth-role-vendor .input-wrapper input:focus {
+  border-color: #D97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}

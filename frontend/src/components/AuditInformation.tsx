@@ -1336,6 +1336,7 @@ export const AuditInformation: React.FC = () => {
                       <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1px solid #E2E8F0', color: '#475569', fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         <th style={{ padding: '0.75rem 1rem' }}>Document / File</th>
                         <th style={{ padding: '0.75rem 1rem' }}>Category</th>
+                        <th style={{ padding: '0.75rem 1rem' }}>Form & Register</th>
                         <th style={{ padding: '0.75rem 1rem' }}>Date Uploaded</th>
                         <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
@@ -1384,6 +1385,35 @@ export const AuditInformation: React.FC = () => {
                               }}>
                                 {doc.type || 'General Compliance'}
                               </span>
+                            </td>
+                            <td style={{ padding: '0.875rem 1rem' }}>
+                              {doc.formNo || doc.natureOfRegister ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  {doc.formNo && (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      width: 'fit-content',
+                                      fontSize: '0.6875rem',
+                                      fontWeight: 750,
+                                      backgroundColor: '#F0FDF4',
+                                      color: '#15803D',
+                                      border: '1px solid #BBF7D0',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px'
+                                    }}>
+                                      {doc.formNo}
+                                    </span>
+                                  )}
+                                  {doc.natureOfRegister && (
+                                    <span style={{ fontSize: '0.6875rem', color: '#475569', fontWeight: 550 }}>
+                                      {doc.natureOfRegister}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>—</span>
+                              )}
                             </td>
                             <td style={{ padding: '0.875rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem' }}>

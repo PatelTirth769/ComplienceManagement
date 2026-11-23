@@ -348,7 +348,7 @@ export const AdminReportDetails: React.FC = () => {
               )}
 
               <div className="law-modal-content-card">
-                <div className="law-content-heading">Statutory Rule / Law Mandate:</div>
+                <div className="law-content-heading">Description</div>
                 {activeLawModal.law?.description?.trim() ? (
                   <div className="law-content-text">{activeLawModal.law.description.trim()}</div>
                 ) : (

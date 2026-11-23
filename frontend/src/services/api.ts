@@ -194,7 +194,20 @@ export async function getVendorDocumentUrl(docId: string): Promise<any> {
   return response.data;
 }
 
-export async function uploadVendorDocument(auditId: string, payload: { fileName: string, fileData: string, type: string }): Promise<any> {
+export async function uploadVendorDocument(auditId: string, payload: {
+  fileName?: string;
+  fileData?: string;
+  type?: string;
+  formNo?: string;
+  natureOfRegister?: string;
+  files?: Array<{
+    fileName: string;
+    fileData: string;
+    type?: string;
+    formNo?: string;
+    natureOfRegister?: string;
+  }>;
+}): Promise<any> {
   const response = await api.post(`/vendor/audits/${auditId}/documents`, payload);
   return response.data;
 }
@@ -213,6 +226,9 @@ export async function respondToVendorFinding(payload: {
   itemId?: string;
   findingId?: string;
   index?: number;
+  attachmentName?: string;
+  attachmentData?: string;
+  attachmentType?: string;
 }): Promise<any> {
   const response = await api.post('/vendor/findings/respond', payload);
   return response.data;

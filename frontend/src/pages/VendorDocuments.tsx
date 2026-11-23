@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getVendorDashboardStats, uploadVendorDocument, getVendorDocuments, getVendorDocumentUrl, getVendorAudits } from '../services/api';
 import { formatDate } from '../utils/dateUtils';
+import { FORM_NO_OPTIONS, NATURE_OF_REGISTER_OPTIONS } from '../utils/statutoryFormOptions';
 
 export const VendorDocuments: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -20,6 +21,8 @@ export const VendorDocuments: React.FC = () => {
 
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [docType, setDocType] = useState('General');
+  const [formNo, setFormNo] = useState('');
+  const [natureOfRegister, setNatureOfRegister] = useState('');
 
   const sidebarItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/vendor' },
@@ -126,31 +129,42 @@ export const VendorDocuments: React.FC = () => {
       reader.onload = async () => {
         const base64Data = reader.result as string;
 
-        const response = await uploadVendorDocument(activeAudit.id, {
-          fileName: fileToUpload.name,
-          fileData: base64Data,
-          type: docType
-        });
+        try {
+          const response = await uploadVendorDocument(activeAudit.id, {
+            fileName: fileToUpload.name,
+            fileData: base64Data,
+            type: docType,
+            formNo: formNo || undefined,
+            natureOfRegister: natureOfRegister || undefined
+          });
 
-        if (response.success) {
-          alert('Document uploaded successfully!');
-          setDocuments(response.data);
-          setFileToUpload(null);
-          setDocType('General');
-          const fileInput = document.getElementById('file-upload-input') as HTMLInputElement;
-          if (fileInput) fileInput.value = '';
-        } else {
-          alert(response.error || 'Failed to upload document.');
+          if (response.success) {
+            alert(`"${fileToUpload.name}" uploaded successfully! You can now select categories and upload your next document.`);
+            setDocuments(response.data);
+            setFileToUpload(null);
+            setDocType('General');
+            setFormNo('');
+            setNatureOfRegister('');
+            const fileInput = document.getElementById('file-upload-input') as HTMLInputElement;
+            if (fileInput) fileInput.value = '';
+          } else {
+            alert(response.error || 'Failed to upload document.');
+          }
+        } catch (apiErr: any) {
+          const msg = apiErr?.response?.data?.error || apiErr?.message || 'Failed to upload document.';
+          alert('Upload failed: ' + msg);
+        } finally {
+          setIsUploading(false);
         }
       };
       reader.onerror = (error) => {
-        console.error('Error converting file to base64', error);
+        console.error('Error reading file', error);
         alert('Error preparing file for upload.');
+        setIsUploading(false);
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed', error);
-      alert('Upload failed');
-    } finally {
+      alert('Upload failed: ' + (error?.message || 'Unknown error'));
       setIsUploading(false);
     }
   };
@@ -243,7 +257,11 @@ export const VendorDocuments: React.FC = () => {
 
   const filteredDocs = documents.filter((doc: any) => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = (doc.fileName || '').toLowerCase().includes(term) || (doc.type || '').toLowerCase().includes(term);
+    const matchesSearch =
+      (doc.fileName || '').toLowerCase().includes(term) ||
+      (doc.type || '').toLowerCase().includes(term) ||
+      (doc.formNo || '').toLowerCase().includes(term) ||
+      (doc.natureOfRegister || '').toLowerCase().includes(term);
     const matchesCategory = categoryFilter === 'ALL' || (doc.type || '').toLowerCase() === categoryFilter.toLowerCase();
     return matchesSearch && matchesCategory;
   });
@@ -371,6 +389,46 @@ export const VendorDocuments: React.FC = () => {
                 </div>
               </div>
 
+              {/* Form No Field */}
+              <div className="vdocs-form-group">
+                <label className="vdocs-label">Form No</label>
+                <div className="vdocs-select-wrapper">
+                  <select
+                    className="vdocs-select"
+                    value={formNo}
+                    onChange={(e) => setFormNo(e.target.value)}
+                  >
+                    <option value="">-- Select Form No (Optional) --</option>
+                    {FORM_NO_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="vdocs-select-arrow" />
+                </div>
+              </div>
+
+              {/* Nature of Register Field */}
+              <div className="vdocs-form-group">
+                <label className="vdocs-label">Nature of Register</label>
+                <div className="vdocs-select-wrapper">
+                  <select
+                    className="vdocs-select"
+                    value={natureOfRegister}
+                    onChange={(e) => setNatureOfRegister(e.target.value)}
+                  >
+                    <option value="">-- Select Nature of Register (Optional) --</option>
+                    {NATURE_OF_REGISTER_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="vdocs-select-arrow" />
+                </div>
+              </div>
+
               {/* Select File Dropzone */}
               <div className="vdocs-form-group">
                 <label className="vdocs-label">Select File Attachment</label>
@@ -415,9 +473,14 @@ export const VendorDocuments: React.FC = () => {
                   <div className="vdocs-selected-chip">
                     <div className="vdocs-selected-info">
                       <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span className="vdocs-selected-name" title={fileToUpload.name}>
-                        {fileToUpload.name}
-                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <span className="vdocs-selected-name" title={fileToUpload.name}>
+                          {fileToUpload.name}
+                        </span>
+                        <div style={{ fontSize: '0.68rem', color: '#64748B' }}>
+                          {(fileToUpload.size / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -518,11 +581,12 @@ export const VendorDocuments: React.FC = () => {
                   <table className="vdocs-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '40%', minWidth: '220px' }}>File Name</th>
-                        <th style={{ width: '18%', minWidth: '120px' }}>Category</th>
-                        <th style={{ width: '15%', minWidth: '100px' }}>Status</th>
-                        <th style={{ width: '15%', minWidth: '110px' }}>Date Uploaded</th>
-                        <th style={{ width: '12%', minWidth: '100px', textAlign: 'right' }}>Actions</th>
+                        <th style={{ width: '32%', minWidth: '180px' }}>File Name</th>
+                        <th style={{ width: '15%', minWidth: '100px' }}>Category</th>
+                        <th style={{ width: '21%', minWidth: '130px' }}>Form & Register</th>
+                        <th style={{ width: '11%', minWidth: '85px' }}>Status</th>
+                        <th style={{ width: '11%', minWidth: '95px' }}>Date Uploaded</th>
+                        <th style={{ width: '10%', minWidth: '85px', textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -551,6 +615,35 @@ export const VendorDocuments: React.FC = () => {
                               <span className="vdocs-category-pill">
                                 {doc.type || 'General'}
                               </span>
+                            </td>
+                            <td>
+                              {doc.formNo || doc.natureOfRegister ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  {doc.formNo && (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      width: 'fit-content',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 750,
+                                      backgroundColor: '#F0FDF4',
+                                      color: '#15803D',
+                                      border: '1px solid #BBF7D0',
+                                      padding: '1px 6px',
+                                      borderRadius: '4px'
+                                    }}>
+                                      {doc.formNo}
+                                    </span>
+                                  )}
+                                  {doc.natureOfRegister && (
+                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 550 }}>
+                                      {doc.natureOfRegister}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>—</span>
+                              )}
                             </td>
                             <td>
                               <span className="vdocs-status-pill">

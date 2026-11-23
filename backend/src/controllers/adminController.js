@@ -639,11 +639,54 @@ exports.createAudit = async (req, res) => {
       return res.status(400).json({ success: false, error: 'An audit for this vendor in this period already exists' });
     }
 
-    // Generate AUD-YYYY-XXXX ID
-    const countSnapshot = await auditsRef.get();
-    const count = countSnapshot.size + 1;
+    // Generate AUD-YYYY-XXXX ID based on highest existing sequence number to avoid duplicate IDs
     const year = new Date().getFullYear();
-    const auditIdString = `AUD-${year}-${String(count).padStart(4, '0')}`;
+    const regex = new RegExp(`^AUD-${year}-(\\d+)`, 'i');
+    let maxSeq = 0;
+
+    const countSnapshot = await auditsRef.get();
+    const existingIds = new Set();
+
+    countSnapshot.docs.forEach(doc => {
+      const d = doc.data();
+      const str = d.auditIdString || d.id || doc.id || '';
+      if (d.auditIdString) existingIds.add(d.auditIdString);
+      if (d.id) existingIds.add(d.id);
+      existingIds.add(doc.id);
+
+      const m = str.match(regex);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+
+    const localCached = loadLocalAuditsCache() || [];
+    localCached.forEach(a => {
+      const str = a.auditIdString || a.id || '';
+      if (a.auditIdString) existingIds.add(a.auditIdString);
+      if (a.id) existingIds.add(a.id);
+
+      const m = str.match(regex);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+
+    // Start with maxSeq + 1 (or at least countSnapshot.size + 1)
+    let nextCount = Math.max(maxSeq + 1, countSnapshot.size + 1);
+    let auditIdString = `AUD-${year}-${String(nextCount).padStart(4, '0')}`;
+
+    // Guarantee uniqueness: if ID already exists anywhere, keep incrementing
+    while (existingIds.has(auditIdString)) {
+      nextCount++;
+      auditIdString = `AUD-${year}-${String(nextCount).padStart(4, '0')}`;
+    }
 
     // Fetch user names for denormalization
     let customerName = 'N/A';
@@ -1404,42 +1447,36 @@ exports.deleteAudit = async (req, res) => {
     const targetAuditIdString = targetData.auditIdString || cachedTarget?.auditIdString || id;
     const baseAuditIdString = targetAuditIdString.replace(/-RA\d*$/, '');
 
-    // 2. Collect ALL related audit document IDs and auditIdStrings (Cascade Original <-> Re-Audit)
+    // 2. Collect ALL related audit document IDs and auditIdStrings (Cascade Original <-> Re-Audit by explicit doc link)
     const auditDocIdsToDelete = new Set();
     const auditIdStringsToDelete = new Set();
 
     auditDocIdsToDelete.add(targetAuditId);
-    auditIdStringsToDelete.add(targetAuditIdString);
-    if (baseAuditIdString) {
-      auditIdStringsToDelete.add(baseAuditIdString);
+    if (targetAuditIdString) {
+      auditIdStringsToDelete.add(targetAuditIdString);
     }
 
     if (targetData.parentAuditId) auditDocIdsToDelete.add(targetData.parentAuditId);
     if (targetData.originalAuditId) auditDocIdsToDelete.add(targetData.originalAuditId);
     if (targetData.originalAuditIdString) auditIdStringsToDelete.add(targetData.originalAuditIdString);
 
-    // Look for all related audits in local cache (original <-> re-audits)
+    // Look for explicitly related audits in local cache (by document IDs or parent links)
     localCached.forEach(a => {
       const aId = a.id;
-      const aStr = a.auditIdString || '';
-      const aBase = aStr.replace(/-RA\d*$/, '');
       const isRelated = 
         auditDocIdsToDelete.has(aId) ||
-        auditIdStringsToDelete.has(aStr) ||
-        (baseAuditIdString && aBase === baseAuditIdString) ||
         (a.parentAuditId && auditDocIdsToDelete.has(a.parentAuditId)) ||
         (a.originalAuditId && auditDocIdsToDelete.has(a.originalAuditId));
 
       if (isRelated) {
         if (aId) auditDocIdsToDelete.add(aId);
-        if (aStr) auditIdStringsToDelete.add(aStr);
-        if (aBase) auditIdStringsToDelete.add(aBase);
+        if (a.auditIdString) auditIdStringsToDelete.add(a.auditIdString);
         if (a.parentAuditId) auditDocIdsToDelete.add(a.parentAuditId);
         if (a.originalAuditId) auditDocIdsToDelete.add(a.originalAuditId);
       }
     });
 
-    // Query Firestore for related original or re-audit docs
+    // Query Firestore for related original or re-audit docs strictly by explicit document ID links
     try {
       if (targetAuditId) {
         const relatedByParent = await auditsRef.where('parentAuditId', '==', targetAuditId).get().catch(() => null);
@@ -1455,16 +1492,6 @@ exports.deleteAudit = async (req, res) => {
         const relatedSiblings = await auditsRef.where('parentAuditId', '==', targetData.parentAuditId).get().catch(() => null);
         if (relatedSiblings) {
           relatedSiblings.forEach(d => {
-            auditDocIdsToDelete.add(d.id);
-            if (d.data().auditIdString) auditIdStringsToDelete.add(d.data().auditIdString);
-          });
-        }
-      }
-
-      if (baseAuditIdString) {
-        const relatedByBase = await auditsRef.where('auditIdString', '==', baseAuditIdString).get().catch(() => null);
-        if (relatedByBase) {
-          relatedByBase.forEach(d => {
             auditDocIdsToDelete.add(d.id);
             if (d.data().auditIdString) auditIdStringsToDelete.add(d.data().auditIdString);
           });
@@ -1532,8 +1559,6 @@ exports.deleteAudit = async (req, res) => {
       let freshCache = loadLocalAuditsCache() || [];
       freshCache = freshCache.filter(a => {
         if (auditDocIdsToDelete.has(a.id)) return false;
-        if (a.auditIdString && auditIdStringsToDelete.has(a.auditIdString)) return false;
-        if (baseAuditIdString && (a.auditIdString || '').replace(/-RA\d*$/, '') === baseAuditIdString) return false;
         if (a.parentAuditId && auditDocIdsToDelete.has(a.parentAuditId)) return false;
         if (a.originalAuditId && auditDocIdsToDelete.has(a.originalAuditId)) return false;
         return true;

@@ -26,7 +26,7 @@ function getAuditCompletionPercentage(audit) {
     return 0;
   }
 
-  const respondedCount = items.filter((i) => 
+  const respondedCount = items.filter((i) =>
     i && ((i.vendorResponse && String(i.vendorResponse).trim().length > 0) || i.status === 'Responded')
   ).length;
 
@@ -95,7 +95,7 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
   // ----------------------------------------------------
   const vendorType = audit.vendorType || 'other-vendor';
   const checklist = checklistService.getChecklistByVendorType(vendorType, { state: audit.state, country: audit.country }) || [];
-  
+
   // Normalize responses into map
   const respMap = {};
   if (Array.isArray(audit.responses)) {
@@ -187,13 +187,14 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
     'Finding Status': 'Open Action Item',
     'Auditor Recommendation': 'Rectify non-compliance and submit proof of closure',
     'Vendor Response': nc.vendorResponse || 'Pending vendor response',
+    'Vendor Attachment': nc.attachmentName || (nc.attachment ? nc.attachment.fileName : '-'),
     'Corrective Action': nc.correctiveAction || 'Pending corrective action'
   }));
 
   const wsFindings = XLSX.utils.json_to_sheet(findingsRows.length > 0 ? findingsRows : [{ 'Notice': 'No non-compliance findings for this audit.' }]);
   wsFindings['!cols'] = [
     { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 40 }, { wch: 35 },
-    { wch: 15 }, { wch: 18 }, { wch: 40 }, { wch: 30 }, { wch: 30 }
+    { wch: 15 }, { wch: 18 }, { wch: 40 }, { wch: 30 }, { wch: 25 }, { wch: 30 }
   ];
   XLSX.utils.book_append_sheet(wb, wsFindings, 'Findings');
 
@@ -228,6 +229,8 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
     'Document ID': d.id || d.docId || `DOC-${i + 1}`,
     'File Name': d.fileName || 'Document File',
     'Category / Type': d.type || d.fileType || 'General Evidence',
+    'Form No': d.formNo || '-',
+    'Nature of Register': d.natureOfRegister || '-',
     'Uploaded By': d.uploadedBy || d.uploader || 'Vendor / Auditor',
     'Upload Date': formatDateTime(d.uploadedAt),
     'Status': d.status || 'Verified',
@@ -236,7 +239,7 @@ function generateAuditExcelBuffer(audit, relatedDocs = []) {
 
   const wsDocs = XLSX.utils.json_to_sheet(docsRows.length > 0 ? docsRows : [{ 'Notice': 'No uploaded documents attached to this audit.' }]);
   wsDocs['!cols'] = [
-    { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 50 }
+    { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 18 }, { wch: 25 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 50 }
   ];
   XLSX.utils.book_append_sheet(wb, wsDocs, 'Documents & Evidence');
 
