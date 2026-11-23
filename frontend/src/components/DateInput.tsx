@@ -62,17 +62,17 @@ export const DateInput: React.FC<DateInputProps> = ({
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value;
-    
+
     // Auto-format digits: if user types digits like 26102026, format as 26/10/2026
     const digitsOnly = raw.replace(/\D/g, '');
-    if (digitsOnly.length === 8 && !raw.includes('/')) {
+    if (digitsOnly.length === 8 && !raw.includes('/') && !raw.includes('-')) {
       raw = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 8)}`;
     }
 
     setDisplayText(raw);
 
-    // If matches complete DD/MM/YYYY
-    const dmyMatch = raw.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+    // If matches complete DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
     if (dmyMatch) {
       const parsed = parseFlexibleDate(raw);
       if (parsed) {
@@ -119,7 +119,7 @@ export const DateInput: React.FC<DateInputProps> = ({
   };
 
   return (
-    <div className="relative w-full flex items-center" style={{ display: 'inline-flex', width: '100%' }}>
+    <div className="relative w-full flex items-center" style={{ position: 'relative', display: 'inline-flex', width: '100%', alignItems: 'center' }}>
       <input
         type="text"
         id={id}
@@ -133,7 +133,7 @@ export const DateInput: React.FC<DateInputProps> = ({
         className={className}
         style={{
           ...style,
-          paddingRight: showCalendarIcon ? '2.5rem' : style.paddingRight
+          paddingRight: showCalendarIcon ? '2.2rem' : style.paddingRight
         }}
       />
 
@@ -142,13 +142,20 @@ export const DateInput: React.FC<DateInputProps> = ({
           onClick={handleIconClick}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 transition-colors"
           style={{
+            position: 'absolute',
+            right: '0.45rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
             zIndex: 2,
-            width: '24px',
-            height: '24px'
+            width: '20px',
+            height: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
           title="Select date"
         >
-          <Calendar className="w-4 h-4 pointer-events-none" />
+          <Calendar className="w-3.5 h-3.5 pointer-events-none" size={14} />
           <input
             type="date"
             ref={pickerRef}

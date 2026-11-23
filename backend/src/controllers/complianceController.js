@@ -162,11 +162,12 @@ async function createAudit(req, res, next) {
       const auditsRef = db.collection('audits');
       const snapshot = await auditsRef.where('auditorId', '==', auditorId).get();
       let candidate = null;
-      
+
       snapshot.forEach(doc => {
         const data = doc.data();
-        const status = (data.status || '').toLowerCase();
-        if (['scheduled', 'in progress'].includes(status) && !data.isReadOnly) {
+        const rawStatus = (data.status || '').toLowerCase().trim();
+        const status = rawStatus.replace(/[-_]/g, ' ');
+        if (['scheduled', 'in progress', 'initiate', 'initiated', 'assigned', 'active'].includes(status) && !data.isReadOnly) {
           if (!candidate) {
             candidate = { id: doc.id, data };
           } else if (data.vendorName && organisation && data.vendorName.toLowerCase().includes(organisation.toLowerCase())) {
@@ -206,8 +207,8 @@ async function createAudit(req, res, next) {
       let resolvedActRules = (existingData.actRules && Array.isArray(existingData.actRules) && existingData.actRules.length > 0)
         ? existingData.actRules
         : ((req.body.actRules && Array.isArray(req.body.actRules) && req.body.actRules.length > 0)
-            ? req.body.actRules
-            : null);
+          ? req.body.actRules
+          : null);
 
       if (!resolvedActRules) {
         const actRulesFilePath = path.join(__dirname, '../data/actRules.json');
@@ -220,6 +221,32 @@ async function createAudit(req, res, next) {
         } else {
           resolvedActRules = [];
         }
+      }
+
+      // Preserve existing vendor responses in nonCompliantItems
+      let finalNonCompliantItems = calculationResult.nonCompliantItems || [];
+      if (Array.isArray(existingData.nonCompliantItems) && existingData.nonCompliantItems.length > 0) {
+        const vendorRespMap = new Map();
+        existingData.nonCompliantItems.forEach(item => {
+          const key = item.itemId || item.id;
+          if (key && (item.vendorResponse || item.status === 'Responded')) {
+            vendorRespMap.set(key, item);
+          }
+        });
+        finalNonCompliantItems = finalNonCompliantItems.map(item => {
+          const key = item.itemId || item.id;
+          const existing = vendorRespMap.get(key);
+          if (existing) {
+            return {
+              ...item,
+              vendorResponse: existing.vendorResponse,
+              respondedAt: existing.respondedAt,
+              actionPlan: existing.actionPlan,
+              status: existing.status
+            };
+          }
+          return item;
+        });
       }
 
       const updateData = {
@@ -239,7 +266,7 @@ async function createAudit(req, res, next) {
         vendorType: normalizedVendorType,
         summary: calculationResult.summary,
         categoryScores: calculationResult.categoryScores,
-        nonCompliantItems: calculationResult.nonCompliantItems,
+        nonCompliantItems: finalNonCompliantItems,
         responses,
         score: calculationResult.summary.score,
         timeline,
@@ -290,6 +317,48 @@ async function createAudit(req, res, next) {
   }
 }
 
+const actRulesFilePath = path.join(__dirname, '../data/actRules.json');
+
+function mergeWithLiveActRules(existingActRules) {
+  let liveRules = [];
+  try {
+    if (fs.existsSync(actRulesFilePath)) {
+      liveRules = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+    }
+  } catch (e) {
+    liveRules = [];
+  }
+
+  if (!liveRules || liveRules.length === 0) {
+    return existingActRules || [];
+  }
+
+  if (!existingActRules || !Array.isArray(existingActRules) || existingActRules.length === 0) {
+    return liveRules;
+  }
+
+  const liveMap = new Map();
+  liveRules.forEach(r => {
+    if (r.id) liveMap.set(String(r.id).toLowerCase(), r);
+    if (r.shortName) liveMap.set(String(r.shortName).toLowerCase(), r);
+  });
+
+  return existingActRules.map(r => {
+    const live = liveMap.get(String(r.id || '').toLowerCase()) || liveMap.get(String(r.shortName || '').toLowerCase());
+    if (live) {
+      return {
+        ...r,
+        attachment: live.attachment || r.attachment || null,
+        description: (live.description && live.description.trim()) ? live.description : (r.description || ''),
+        actName: live.actName || r.actName,
+        category: live.category || r.category,
+        states: (live.states && live.states.length > 0) ? live.states : r.states
+      };
+    }
+    return r;
+  });
+}
+
 /**
  * Get Audit by ID
  */
@@ -310,7 +379,10 @@ async function getAuditById(req, res, next) {
 
     return res.status(200).json({
       success: true,
-      data: audit
+      data: {
+        ...audit,
+        actRules: mergeWithLiveActRules(audit.actRules)
+      }
     });
   } catch (err) {
     next(err);
@@ -346,14 +418,30 @@ async function getMyAssignedAudits(req, res, next) {
     }
 
     const audits = [];
+    const allowedStatuses = new Set([
+      'scheduled',
+      'initiate',
+      'initiated',
+      'in progress',
+      'pending sign-off',
+      'pending sign off',
+      'under review',
+      'review',
+      'submitted',
+      'assigned',
+      'active'
+    ]);
+
     snapshot.forEach(doc => {
       const data = doc.data();
-      const status = (data.status || '').toLowerCase();
-      if (['scheduled', 'in progress', 'pending sign-off', 'under review', 'review', 'submitted'].includes(status) || !data.status) {
+      const rawStatus = (data.status || '').toLowerCase().trim();
+      const statusSpaced = rawStatus.replace(/[-_]/g, ' ');
+      if (allowedStatuses.has(rawStatus) || allowedStatuses.has(statusSpaced) || !data.status) {
         const allowDocs = data.allowAuditorToSeeDocuments === true;
         audits.push({
           id: doc.id,
           ...data,
+          actRules: mergeWithLiveActRules(data.actRules),
           auditType: data.auditType || 'Original',
           isReadOnly: data.isReadOnly === true,
           allowAuditorToSeeDocuments: allowDocs,
@@ -364,7 +452,46 @@ async function getMyAssignedAudits(req, res, next) {
 
     return res.status(200).json({ success: true, data: audits });
   } catch (err) {
-    next(err);
+    console.warn('[getMyAssignedAudits] DB warning/error, attempting local cache fallback:', err.message);
+    try {
+      const localList = loadLocalAudits() || [];
+      const audits = [];
+      const allowedStatuses = new Set([
+        'scheduled',
+        'initiate',
+        'initiated',
+        'in progress',
+        'pending sign-off',
+        'pending sign off',
+        'under review',
+        'review',
+        'submitted',
+        'assigned',
+        'active'
+      ]);
+      localList.forEach(data => {
+        if (auditorId && data.auditorId && data.auditorId !== auditorId) {
+          return;
+        }
+        const rawStatus = (data.status || '').toLowerCase().trim();
+        const statusSpaced = rawStatus.replace(/[-_]/g, ' ');
+        if (allowedStatuses.has(rawStatus) || allowedStatuses.has(statusSpaced) || !data.status) {
+          const allowDocs = data.allowAuditorToSeeDocuments === true;
+          audits.push({
+            id: data.id,
+            ...data,
+            actRules: mergeWithLiveActRules(data.actRules),
+            auditType: data.auditType || 'Original',
+            isReadOnly: data.isReadOnly === true,
+            allowAuditorToSeeDocuments: allowDocs,
+            documents: allowDocs ? (data.documents || []) : []
+          });
+        }
+      });
+      return res.status(200).json({ success: true, data: audits });
+    } catch (fallbackErr) {
+      next(err);
+    }
   }
 }
 
@@ -868,6 +995,58 @@ function saveLocalAudits(audits) {
 }
 
 /**
+ * Get all vendors for Auditor and Interview dropdowns
+ */
+async function getVendors(req, res, next) {
+  try {
+    const db = getDb();
+    const vendorsMap = new Map();
+
+    if (db) {
+      try {
+        const snap = await db.collection('users').get();
+        snap.forEach(doc => {
+          const d = doc.data();
+          const role = (d.role || '').toLowerCase();
+          if (role === 'vendor') {
+            const name = (d.companyName || d.organisation || d.name || d.fullName || d.contactPerson || doc.id).trim();
+            if (name) {
+              vendorsMap.set(name.toLowerCase(), {
+                id: doc.id,
+                name,
+                email: d.email ? d.email.trim() : '',
+                companyName: d.companyName || name
+              });
+            }
+          }
+        });
+      } catch (dbErr) {
+        console.warn('[getVendors DB warning]:', dbErr.message);
+      }
+    }
+
+    // Also collect from local audits cache as fallback
+    const audits = loadLocalAudits() || [];
+    audits.forEach(a => {
+      const vName = (a.vendorName || a.vendor || '').trim();
+      if (vName && !vendorsMap.has(vName.toLowerCase())) {
+        vendorsMap.set(vName.toLowerCase(), {
+          id: a.vendorId || vName,
+          name: vName,
+          email: a.vendorEmail ? a.vendorEmail.trim() : '',
+          companyName: vName
+        });
+      }
+    });
+
+    const vendors = Array.from(vendorsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return res.status(200).json({ success: true, vendors });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * Update Interview Resources for an Audit
  */
 async function updateInterviewResources(req, res, next) {
@@ -920,7 +1099,7 @@ async function updateInterviewResources(req, res, next) {
 
       const loginId = r.loginId || (existing && existing.loginId) || `INT-${randDigits}`;
       const pass = r.pass || (existing && existing.pass) || `Pass@${randPass}`;
-      
+
       // Support multiple questions or single question
       let questions = [];
       if (Array.isArray(r.questions) && r.questions.length > 0) {
@@ -964,7 +1143,7 @@ async function updateInterviewResources(req, res, next) {
     if (auditData.status === 'Scheduled' || !auditData.status) {
       updatePayload.status = 'Initiate';
     }
-    
+
     const targetAuditId = (actualRef && actualRef.id) || auditId;
     try {
       if (actualRef) {
@@ -1019,69 +1198,89 @@ async function updateInterviewResources(req, res, next) {
       // ignore
     }
 
-    // Send automated email to the auditor ONLY when sendEmail is true (when Admin clicks "Save Question")
+    // Send automated email to the vendor selected by the auditor ONLY when sendEmail is true (when Admin clicks "Save Question")
     let emailSent = false;
     let recipientEmail = null;
-    let recipientName = auditData.auditorName || (auditData.auditor !== 'Auditor' ? auditData.auditor : '') || 'Auditor';
+    let recipientName = null;
 
     if (sendEmail === true && cleanResources.length > 0) {
-      // 1. Check passed auditorEmail if it contains '@'
-      if (typeof auditorEmail === 'string' && auditorEmail.includes('@')) {
+      // 1. First check if vendorEmail was passed in request body
+      if (typeof req.body.vendorEmail === 'string' && req.body.vendorEmail.includes('@')) {
+        recipientEmail = req.body.vendorEmail.trim();
+      }
+
+      // 2. Check candidate resource(s): did auditor select vendor on any resource?
+      if (!recipientEmail) {
+        for (const r of cleanResources) {
+          if (r.vendorEmail && r.vendorEmail.includes('@')) {
+            recipientEmail = r.vendorEmail.trim();
+            recipientName = r.name || r.vendorName || 'Vendor';
+            break;
+          }
+        }
+      }
+
+      // 3. Resolve vendor by selected resource's name (r.name) in 'users' collection
+      const selectedResourceName = (cleanResources[0]?.name || '').trim();
+      if (!recipientEmail && selectedResourceName && db) {
+        try {
+          const uSnap = await db.collection('users').get();
+          uSnap.forEach(doc => {
+            if (recipientEmail) return;
+            const d = doc.data();
+            const role = (d.role || '').toLowerCase();
+            if (role === 'vendor') {
+              const vName = (d.companyName || d.organisation || d.name || d.fullName || d.contactPerson || doc.id).trim().toLowerCase();
+              if (vName === selectedResourceName.toLowerCase() && d.email && d.email.includes('@')) {
+                recipientEmail = d.email.trim();
+                recipientName = d.companyName || d.name || selectedResourceName;
+              }
+            }
+          });
+        } catch (e) {
+          console.warn('[updateInterviewResources]: Error finding vendor by name in users:', e.message);
+        }
+      }
+
+      // 4. Fallback: check auditData.vendorEmail
+      if (!recipientEmail && typeof auditData.vendorEmail === 'string' && auditData.vendorEmail.includes('@')) {
+        recipientEmail = auditData.vendorEmail.trim();
+        recipientName = recipientName || auditData.vendorName || 'Vendor';
+      }
+
+      // 5. Fallback: check auditData.vendorId in 'users' collection
+      if (!recipientEmail && auditData.vendorId && db) {
+        try {
+          const venDoc = await db.collection('users').doc(auditData.vendorId).get();
+          if (venDoc.exists) {
+            const vd = venDoc.data();
+            if (vd.email && vd.email.includes('@')) {
+              recipientEmail = vd.email.trim();
+              recipientName = recipientName || vd.companyName || vd.name || 'Vendor';
+            }
+          }
+        } catch (e) {
+          console.warn('[updateInterviewResources]: Error resolving vendorId:', e.message);
+        }
+      }
+
+      // 6. Fallback: check passed auditorEmail param if it's an email
+      if (!recipientEmail && typeof auditorEmail === 'string' && auditorEmail.includes('@')) {
         recipientEmail = auditorEmail.trim();
       }
 
-      // 2. Check auditData.auditorEmail
-      if (!recipientEmail && typeof auditData.auditorEmail === 'string' && auditData.auditorEmail.includes('@')) {
-        recipientEmail = auditData.auditorEmail.trim();
-      }
-
-      // 3. Check auditData.auditor if it is an email
-      if (!recipientEmail && typeof auditData.auditor === 'string' && auditData.auditor.includes('@')) {
-        recipientEmail = auditData.auditor.trim();
-      }
-
-      // 4. Resolve via auditData.auditorId in 'users' collection
-      const targetAuditorId = auditData.auditorId || (typeof auditData.auditor === 'string' && auditData.auditor !== 'Auditor' ? auditData.auditor : null);
-      if (!recipientEmail && targetAuditorId && db) {
-        try {
-          const uSnap = await db.collection('users').doc(targetAuditorId).get();
-          if (uSnap.exists) {
-            const uData = uSnap.data() || {};
-            if (uData.email && uData.email.includes('@')) {
-              recipientEmail = uData.email.trim();
-            }
-            if (uData.fullName || uData.name) {
-              recipientName = uData.fullName || uData.name;
-            }
-          }
-        } catch (e) {
-          console.warn('Could not resolve auditorId in users:', e.message);
-        }
-      }
-
-      // 5. Fallback lookup to any auditor user in DB if still not found
-      if (!recipientEmail && db) {
-        try {
-          const aSnap = await db.collection('users').where('role', '==', 'auditor').limit(1).get();
-          if (!aSnap.empty) {
-            const firstAuditor = aSnap.docs[0].data();
-            if (firstAuditor && firstAuditor.email && firstAuditor.email.includes('@')) {
-              recipientEmail = firstAuditor.email.trim();
-              recipientName = firstAuditor.fullName || firstAuditor.name || recipientName;
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-
+      // 7. Ultimate fallback if still not found
       if (!recipientEmail || !recipientEmail.includes('@')) {
         recipientEmail = 'ww@gmail.com';
       }
 
+      recipientName = recipientName || selectedResourceName || auditData.vendorName || 'Vendor';
+
       const emailService = require('../services/emailService');
       emailService.sendInterviewScheduledEmail({
         recipientEmail,
+        recipientName,
+        vendorName: recipientName,
         auditorName: recipientName,
         auditIdString: auditData.auditIdString || auditData.id || auditId,
         auditPeriod: auditData.auditPeriod || 'Current Period',
@@ -1095,7 +1294,7 @@ async function updateInterviewResources(req, res, next) {
     return res.status(200).json({
       success: true,
       message: emailSent
-        ? `Interview question saved and email sent to auditor (${recipientEmail}) successfully`
+        ? `Interview question saved and email sent to vendor ${recipientName || ''} (${recipientEmail}) successfully`
         : 'Interview resources saved successfully',
       data: cleanResources,
       resources: cleanResources,
@@ -1141,8 +1340,8 @@ async function interviewLogin(req, res, next) {
         if (!existing) {
           allAuditsMap.set(a.id, a);
         } else {
-          const aHasQ = Array.isArray(a.interviewResources) && a.interviewResources.some(r => 
-            (r.question && r.question.trim().length > 0) || 
+          const aHasQ = Array.isArray(a.interviewResources) && a.interviewResources.some(r =>
+            (r.question && r.question.trim().length > 0) ||
             (Array.isArray(r.questions) && r.questions.some(q => q && q.question && q.question.trim().length > 0)) ||
             r.isQuestionSaved
           );
@@ -1164,9 +1363,9 @@ async function interviewLogin(req, res, next) {
     const matches = [];
     combinedAudits.forEach(a => {
       if (Array.isArray(a.interviewResources)) {
-        const found = a.interviewResources.find(r => 
-          r && r.loginId && 
-          String(r.loginId).trim().toLowerCase() === cleanLoginId && 
+        const found = a.interviewResources.find(r =>
+          r && r.loginId &&
+          String(r.loginId).trim().toLowerCase() === cleanLoginId &&
           isPassMatch(r.pass, cleanPass)
         );
         if (found) {
@@ -1263,7 +1462,7 @@ async function interviewLogin(req, res, next) {
  */
 async function submitInterviewAnswer(req, res, next) {
   try {
-    const { auditId, resourceId, answer, answers, questions } = req.body;
+    const { auditId, resourceId, answer, answers, questions, proctoring, status } = req.body;
     if (!auditId || !resourceId) {
       return res.status(400).json({ success: false, error: 'Audit ID and Resource ID are required.' });
     }
@@ -1339,11 +1538,14 @@ async function submitInterviewAnswer(req, res, next) {
 
         const primaryAnswer = resQuestions[0]?.answer || answer || '';
 
+        const finalStatus = status || 'Completed';
+
         updatedResource = {
           ...r,
           answer: primaryAnswer,
           questions: resQuestions,
-          status: 'In Progress'
+          status: finalStatus,
+          proctoring: proctoring !== undefined ? proctoring : (r.proctoring || null)
         };
         return updatedResource;
       }
@@ -1372,7 +1574,7 @@ async function submitInterviewAnswer(req, res, next) {
           const relatedDocIds = new Set();
           if (auditData.parentAuditId) relatedDocIds.add(auditData.parentAuditId);
           if (auditData.originalAuditId) relatedDocIds.add(auditData.originalAuditId);
-          
+
           const childAudits = await db.collection('audits').where('parentAuditId', '==', targetAuditId).get();
           childAudits.forEach(d => relatedDocIds.add(d.id));
 
@@ -1381,7 +1583,7 @@ async function submitInterviewAnswer(req, res, next) {
               await db.collection('audits').doc(relId).update({
                 interviewResources: firestoreSafeResources,
                 updatedAt: new Date().toISOString()
-              }).catch(() => {});
+              }).catch(() => { });
             }
           }
         } catch (relErr) {
@@ -1407,18 +1609,24 @@ async function submitInterviewAnswer(req, res, next) {
         if (a.id === targetAuditId || a.auditIdString === targetAuditId) {
           return { ...a, interviewResources: updated };
         }
-        // Also sync answer and attachments to any other audit sharing this candidate resource ID or loginId
-        if (Array.isArray(a.interviewResources) && a.interviewResources.length > 0) {
+        // Only sync answer and attachments to directly related Parent/Child Re-Audits sharing the candidate's unique loginId
+        const isRelatedAudit = (
+          a.parentAuditId === targetAuditId ||
+          a.originalAuditId === targetAuditId ||
+          (auditData && (auditData.parentAuditId === a.id || auditData.originalAuditId === a.id))
+        );
+        if (isRelatedAudit && Array.isArray(a.interviewResources) && a.interviewResources.length > 0) {
           let modified = false;
           const synced = a.interviewResources.map(ex => {
-            const match = updated.find(ur => (ur.id && ur.id === ex.id) || (ur.loginId && ur.loginId === ex.loginId));
+            const match = updated.find(ur => ur.loginId && ex.loginId && ur.loginId === ex.loginId);
             if (match) {
               modified = true;
               return {
                 ...ex,
                 answer: match.answer !== undefined ? match.answer : ex.answer,
                 questions: match.questions || ex.questions,
-                status: match.status || ex.status
+                status: match.status || ex.status,
+                proctoring: match.proctoring !== undefined ? match.proctoring : ex.proctoring
               };
             }
             return ex;
@@ -1485,7 +1693,7 @@ async function getInterviewSession(req, res, next) {
       return res.status(404).json({ success: false, error: 'Audit not found' });
     }
     let resource = (auditData.interviewResources || []).find(r => r.id === resourceId || (r.loginId && r.loginId === resourceId));
-    
+
     // Fallback: If resource questions are empty or missing, check if any other audit has this resource with saved questions
     const hasQ = (res) => res && ((Array.isArray(res.questions) && res.questions.some(q => q && q.question && q.question.trim().length > 0)) || (res.question && res.question.trim().length > 0) || res.isQuestionSaved);
     if (!resource || !hasQ(resource)) {
@@ -1535,6 +1743,7 @@ module.exports = {
   getAuditDocuments,
   getDocumentDownloadUrl,
   updateInterviewResources,
+  getVendors,
   interviewLogin,
   submitInterviewAnswer,
   getInterviewSession

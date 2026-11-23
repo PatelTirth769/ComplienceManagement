@@ -56,9 +56,25 @@ export const NonCompliantList: React.FC<NonCompliantListProps> = ({ items }) => 
                 <span className="badge badge-act">{item.type}</span>
                 <span className="item-id-code">{item.itemId}</span>
               </div>
-              <span className="action-required-pill">
-                <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Action Required
-              </span>
+              {item.vendorResponse && item.vendorResponse.trim().length > 0 ? (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  fontSize: '0.725rem',
+                  fontWeight: 700,
+                  backgroundColor: '#ECFDF5',
+                  color: '#059669',
+                  border: '1px solid #A7F3D0',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '9999px'
+                }}>
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Responded
+                </span>
+              ) : (
+                <span className="action-required-pill">
+                  <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Action Required
+                </span>
+              )}
             </div>
 
             <h4 className="non-compliant-item-title">{item.title}</h4>
@@ -77,6 +93,22 @@ export const NonCompliantList: React.FC<NonCompliantListProps> = ({ items }) => 
               </div>
               <p className="non-compliant-remarks-text">{item.remarks}</p>
             </div>
+
+            {/* Vendor Response Green Box */}
+            {item.vendorResponse && item.vendorResponse.trim().length > 0 && (
+              <div className="non-compliant-vendor-response-box">
+                <div className="non-compliant-vendor-response-header">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Vendor Response:</span>
+                </div>
+                <p className="non-compliant-vendor-response-text">{item.vendorResponse}</p>
+                {item.actionPlan && (
+                  <p className="non-compliant-vendor-action-text">
+                    <strong>Action Plan:</strong> {item.actionPlan}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

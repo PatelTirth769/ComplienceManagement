@@ -205,10 +205,10 @@ export async function getVendorFindings(auditId?: string): Promise<any> {
   return response.data;
 }
 
-export async function respondToVendorFinding(payload: { 
-  auditId: string; 
-  itemCategory?: string; 
-  itemText?: string; 
+export async function respondToVendorFinding(payload: {
+  auditId: string;
+  itemCategory?: string;
+  itemText?: string;
   responseText: string;
   itemId?: string;
   findingId?: string;
@@ -282,10 +282,37 @@ export async function updateInterviewAuditAccess(auditId: string, allow: boolean
   return response.data;
 }
 
-export async function saveInterviewResources(auditId: string, resources: any[], auditorEmail?: string, sendEmail?: boolean): Promise<any> {
+export async function updateAuditTimeline(auditId: string, startDate: string, dueDate: string, notes?: string): Promise<any> {
+  const response = await api.patch(`/admin/audits/${auditId}/timeline`, {
+    startDate,
+    dueDate,
+    notes
+  });
+  return response.data;
+}
+
+export interface VendorOption {
+  id: string;
+  name: string;
+  email: string;
+  companyName?: string;
+}
+
+export async function getVendorsList(): Promise<VendorOption[]> {
+  try {
+    const res = await api.get<{ success: boolean; vendors: VendorOption[] }>('/compliance/vendors');
+    return res.data?.vendors || [];
+  } catch (err) {
+    console.warn('Failed to load vendors list:', err);
+    return [];
+  }
+}
+
+export async function saveInterviewResources(auditId: string, resources: any[], vendorOrAuditorEmail?: string, sendEmail?: boolean): Promise<any> {
   const response = await api.patch(`/compliance/audits/${auditId}/interview-resources`, {
     resources,
-    auditorEmail,
+    auditorEmail: vendorOrAuditorEmail,
+    vendorEmail: vendorOrAuditorEmail,
     sendEmail: sendEmail === true
   });
   return response.data;
@@ -297,18 +324,22 @@ export async function interviewLogin(loginId: string, pass: string, auditId?: st
 }
 
 export async function submitInterviewAnswer(
-  auditId: string, 
-  resourceId: string, 
-  answer?: string, 
-  answers?: Record<string, string>, 
-  questions?: any[]
+  auditId: string,
+  resourceId: string,
+  answer?: string,
+  answers?: Record<string, string>,
+  questions?: any[],
+  proctoring?: any,
+  status: string = 'Completed'
 ): Promise<any> {
-  const response = await api.post('/compliance/interview-answer', { 
-    auditId, 
-    resourceId, 
-    answer, 
-    answers, 
-    questions 
+  const response = await api.post('/compliance/interview-answer', {
+    auditId,
+    resourceId,
+    answer,
+    answers,
+    questions,
+    proctoring,
+    status
   });
   return response.data;
 }
@@ -367,6 +398,14 @@ export async function getCustomerOverallReport(): Promise<any> {
   return response.data;
 }
 
+export interface ActRuleAttachment {
+  fileName: string;
+  fileType?: string;
+  fileSize?: number;
+  fileData: string; // Base64 data URL
+  uploadedAt?: string;
+}
+
 export interface ActRule {
   id: string;
   actName: string;
@@ -375,6 +414,7 @@ export interface ActRule {
   states: string[];
   formsCount?: number;
   description: string;
+  attachment?: ActRuleAttachment | null;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -389,8 +429,8 @@ export async function saveActRules(rules: ActRule[]): Promise<{ success: boolean
   return response.data;
 }
 
-export async function saveActRuleById(id: string, description: string): Promise<{ success: boolean; message: string; rule: ActRule }> {
-  const response = await api.put<{ success: boolean; message: string; rule: ActRule }>(`/admin/rules/${id}`, { description });
+export async function saveActRuleById(id: string, description: string, attachment?: ActRuleAttachment | null): Promise<{ success: boolean; message: string; rule: ActRule }> {
+  const response = await api.put<{ success: boolean; message: string; rule: ActRule }>(`/admin/rules/${id}`, { description, attachment });
   return response.data;
 }
 

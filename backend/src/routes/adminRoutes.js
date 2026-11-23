@@ -22,6 +22,9 @@ router.get('/audits/:auditId/download-excel', adminController.downloadAuditExcel
 router.patch('/audits/:id/status', adminController.updateAuditStatus);
 router.put('/audits/:id/status', adminController.updateAuditStatus);
 router.post('/audits/:id/status', adminController.updateAuditStatus);
+router.patch('/audits/:id/timeline', adminController.updateAuditTimeline);
+router.put('/audits/:id/timeline', adminController.updateAuditTimeline);
+router.post('/audits/:id/timeline', adminController.updateAuditTimeline);
 router.delete('/audits/:id', adminController.deleteAudit);
 
 // Checklist Management

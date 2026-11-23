@@ -8,6 +8,47 @@ const { parseFlexibleDate, calculateAuditCycle, toIsoDate, formatDate } = requir
 
 const actRulesFilePath = path.join(__dirname, '../data/actRules.json');
 
+function mergeWithLiveActRules(existingActRules) {
+  let liveRules = [];
+  try {
+    if (fs.existsSync(actRulesFilePath)) {
+      liveRules = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
+    }
+  } catch (e) {
+    liveRules = [];
+  }
+
+  if (!liveRules || liveRules.length === 0) {
+    return existingActRules || [];
+  }
+
+  if (!existingActRules || !Array.isArray(existingActRules) || existingActRules.length === 0) {
+    return liveRules;
+  }
+
+  const liveMap = new Map();
+  liveRules.forEach(r => {
+    if (r.id) liveMap.set(String(r.id).toLowerCase(), r);
+    if (r.shortName) liveMap.set(String(r.shortName).toLowerCase(), r);
+  });
+
+  return existingActRules.map(r => {
+    const live = liveMap.get(String(r.id || '').toLowerCase()) || liveMap.get(String(r.shortName || '').toLowerCase());
+    if (live) {
+      return {
+        ...r,
+        attachment: live.attachment || r.attachment || null,
+        description: (live.description && live.description.trim()) ? live.description : (r.description || ''),
+        actName: live.actName || r.actName,
+        category: live.category || r.category,
+        states: (live.states && live.states.length > 0) ? live.states : r.states
+      };
+    }
+    return r;
+  });
+}
+exports.mergeWithLiveActRules = mergeWithLiveActRules;
+
 // Checklist Management
 exports.getChecklists = async (req, res) => {
   try {
@@ -139,8 +180,8 @@ exports.saveActRules = async (req, res) => {
 exports.saveActRuleById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { description } = req.body;
-    if (typeof description !== 'string') {
+    const { description, attachment } = req.body;
+    if (description !== undefined && typeof description !== 'string') {
       return res.status(400).json({ success: false, error: 'Description must be a string' });
     }
 
@@ -154,7 +195,12 @@ exports.saveActRuleById = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Act rule not found' });
     }
 
-    rules[idx].description = description;
+    if (description !== undefined) {
+      rules[idx].description = description;
+    }
+    if (attachment !== undefined) {
+      rules[idx].attachment = attachment;
+    }
     rules[idx].updatedAt = new Date().toISOString();
     rules[idx].updatedBy = req.user ? req.user.email || req.user.name || 'Admin' : 'Admin';
 
@@ -605,6 +651,7 @@ exports.createAudit = async (req, res) => {
     let vendorName = 'N/A';
     let auditorName = 'N/A';
     let vendorEmail = '';
+    let auditorEmail = '';
 
     try {
       const [custDoc, venDoc, audDoc] = await Promise.all([
@@ -618,13 +665,54 @@ exports.createAudit = async (req, res) => {
         customerEmail = cd.email || '';
       }
       if (venDoc.exists) {
-        vendorName = venDoc.data().name || venDoc.data().companyName || 'Vendor';
-        vendorEmail = venDoc.data().email || '';
+        const vd = venDoc.data();
+        vendorName = vd.name || vd.companyName || vd.fullName || 'Vendor';
+        vendorEmail = vd.email || '';
       }
-      if (audDoc.exists) auditorName = audDoc.data().name || 'Auditor';
+      if (audDoc.exists) {
+        const ad = audDoc.data();
+        auditorName = ad.name || ad.fullName || ad.companyName || 'Auditor';
+        auditorEmail = ad.email || '';
+      }
     } catch (e) {
       console.warn('Error fetching names for new audit:', e.message);
     }
+
+    // Additional query fallbacks if email was not found via document ID
+    if (!customerEmail && customerId) {
+      try {
+        const cSnap = await db.collection('users').where('email', '==', String(customerId).toLowerCase().trim()).get();
+        if (!cSnap.empty) {
+          const cd = cSnap.docs[0].data();
+          customerName = cd.name || cd.organisation || cd.companyName || cd.fullName || customerName;
+          customerEmail = cd.email || '';
+        }
+      } catch (e) {}
+    }
+    if (!vendorEmail && vendorId) {
+      try {
+        const vSnap = await db.collection('users').where('email', '==', String(vendorId).toLowerCase().trim()).get();
+        if (!vSnap.empty) {
+          const vd = vSnap.docs[0].data();
+          vendorName = vd.name || vd.companyName || vd.fullName || vendorName;
+          vendorEmail = vd.email || '';
+        }
+      } catch (e) {}
+    }
+    if (!auditorEmail && auditorId) {
+      try {
+        const aSnap = await db.collection('users').where('email', '==', String(auditorId).toLowerCase().trim()).get();
+        if (!aSnap.empty) {
+          const ad = aSnap.docs[0].data();
+          auditorName = ad.name || ad.fullName || ad.companyName || auditorName;
+          auditorEmail = ad.email || '';
+        }
+      } catch (e) {}
+    }
+
+    customerEmail = (customerEmail || req.body.customerEmail || '').trim();
+    vendorEmail = (vendorEmail || req.body.vendorEmail || '').trim();
+    auditorEmail = (auditorEmail || req.body.auditorEmail || '').trim();
 
     const isoStart = toIsoDate(sDate);
     const isoDue = toIsoDate(dDate);
@@ -676,6 +764,7 @@ exports.createAudit = async (req, res) => {
       vendorEmail,
       auditorId,
       auditorName,
+      auditorEmail,
       auditor: auditorName,
       auditPeriod: finalAuditPeriod,
       auditFrequency: auditFrequency || (cycleInfo ? cycleInfo.frequency : 'Quarterly'),
@@ -704,8 +793,11 @@ exports.createAudit = async (req, res) => {
         auditType: newAudit.auditType || 'Original',
         isReadOnly: false,
         customerName: newAudit.customerName,
+        customerEmail: newAudit.customerEmail,
         vendorName: newAudit.vendorName,
+        vendorEmail: newAudit.vendorEmail,
         auditorName: newAudit.auditorName,
+        auditorEmail: newAudit.auditorEmail,
         compliantCount: 0,
         nonCompliantCount: 0,
         totalApplicable: 0,
@@ -724,10 +816,13 @@ exports.createAudit = async (req, res) => {
       console.warn('[Admin Controller createAudit]: Cache sync warning:', cacheErr.message);
     }
 
-    // Send immediate email and notification to vendor regarding newly scheduled audit
+    const portalUrl = req.get('origin') || (req.get('referer') ? new URL(req.get('referer')).origin : null) || process.env.FRONTEND_URL || 'http://localhost:5174';
+
+    // Send immediate email and notification to vendor regarding newly scheduled audit (with Customer in CC)
     if (vendorEmail) {
       emailService.sendAuditScheduledEmail({
         vendorEmail,
+        customerEmail: customerEmail || undefined,
         vendorName,
         customerName,
         auditorName,
@@ -737,10 +832,10 @@ exports.createAudit = async (req, res) => {
         dueDate: formatDate(isoDue),
         establishmentType: establishmentType || '',
         state: state || 'N/A',
-        portalUrl: req.get('origin') || (req.get('referer') ? new URL(req.get('referer')).origin : null) || process.env.FRONTEND_URL || 'http://localhost:5174'
+        portalUrl
       }).then(emailRes => {
         if (emailRes && emailRes.success) {
-          console.log(`[Admin Controller]: Immediate audit scheduled email successfully sent to ${vendorEmail} for audit ${auditIdString}`);
+          console.log(`[Admin Controller]: Immediate audit scheduled email successfully sent to ${vendorEmail}${customerEmail ? ` (CC: ${customerEmail})` : ''} for audit ${auditIdString}`);
         }
       }).catch(err => {
         console.warn(`[Admin Controller]: Failed to send scheduled audit email to ${vendorEmail}:`, err.message);
@@ -757,7 +852,45 @@ exports.createAudit = async (req, res) => {
         read: false,
         createdAt: new Date().toISOString()
       }).catch(notifErr => {
-        console.warn('[Admin Controller]: Could not create in-app notification:', notifErr.message);
+        console.warn('[Admin Controller]: Could not create in-app notification for vendor:', notifErr.message);
+      });
+    }
+
+    // Send immediate email and notification to auditor that audit has been created and assigned
+    if (auditorEmail) {
+      emailService.sendAuditorAuditAssignedEmail({
+        auditorEmail,
+        auditorName,
+        vendorName,
+        customerName,
+        auditIdString,
+        auditPeriod: finalAuditPeriod,
+        startDate: formatDate(isoStart),
+        dueDate: formatDate(isoDue),
+        establishmentType: establishmentType || '',
+        state: state || 'N/A',
+        portalUrl
+      }).then(audEmailRes => {
+        if (audEmailRes && audEmailRes.success) {
+          console.log(`[Admin Controller]: Immediate audit assignment email successfully sent to auditor ${auditorEmail} for audit ${auditIdString}`);
+        }
+      }).catch(err => {
+        console.warn(`[Admin Controller]: Failed to send audit assignment email to auditor ${auditorEmail}:`, err.message);
+      });
+    }
+
+    if (auditorId) {
+      db.collection('notifications').add({
+        userId: auditorId,
+        role: 'Auditor',
+        title: '📋 New Audit Assigned',
+        message: `Audit ${auditIdString} for ${vendorName} (${finalAuditPeriod}) has been assigned to you.`,
+        auditId: docRef.id,
+        type: 'audit_assigned',
+        read: false,
+        createdAt: new Date().toISOString()
+      }).catch(notifErr => {
+        console.warn('[Admin Controller]: Could not create in-app notification for auditor:', notifErr.message);
       });
     }
 
@@ -975,19 +1108,8 @@ exports.getAuditById = async (req, res) => {
     const findingsPending = auditData.findingsPending ?? nonCompliantItems.filter(f => f.vendorResponse && f.status !== 'Resolved').length;
     const findingsOpen = auditData.findingsOpen ?? Math.max(0, findingsCount - findingsResolved - findingsPending);
 
-    // Resolve actRules snapshot for this audit
-    let actRulesSnapshot = auditData.actRules;
-    if (!actRulesSnapshot || !Array.isArray(actRulesSnapshot) || actRulesSnapshot.length === 0) {
-      if (fs.existsSync(actRulesFilePath)) {
-        try {
-          actRulesSnapshot = JSON.parse(fs.readFileSync(actRulesFilePath, 'utf-8'));
-        } catch (e) {
-          actRulesSnapshot = [];
-        }
-      } else {
-        actRulesSnapshot = [];
-      }
-    }
+    // Resolve actRules snapshot for this audit merged with latest live attachments
+    const actRulesSnapshot = mergeWithLiveActRules(auditData.actRules);
 
     // Enrich responses with checklist metadata if missing
     let enrichedResponses = auditData.responses;
@@ -1099,6 +1221,129 @@ exports.updateAuditStatus = async (req, res) => {
   } catch (error) {
     console.error('updateAuditStatus error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+exports.updateAuditTimeline = async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+    const { startDate, dueDate, notes } = req.body;
+
+    if (!startDate || !dueDate) {
+      return res.status(400).json({ success: false, error: 'startDate and dueDate are required' });
+    }
+
+    const sDate = parseFlexibleDate(startDate);
+    const dDate = parseFlexibleDate(dueDate);
+    if (!sDate || !dDate) {
+      return res.status(400).json({ success: false, error: 'Invalid date format' });
+    }
+    if (dDate < sDate) {
+      return res.status(400).json({ success: false, error: 'Due date cannot be before start date' });
+    }
+
+    const formattedStart = toIsoDate(sDate);
+    const formattedDue = toIsoDate(dDate);
+
+    // Fetch existing audit
+    const auditRef = db.collection('audits').doc(id);
+    const doc = await auditRef.get();
+    let auditData = null;
+    let targetAuditDocId = id;
+
+    if (doc.exists) {
+      auditData = doc.data();
+    } else {
+      // Check in local cache
+      const cached = loadLocalAuditsCache().find(a => a.id === id || a.auditIdString === id);
+      if (cached) {
+        auditData = cached;
+        targetAuditDocId = cached.id;
+      }
+    }
+
+    if (!auditData) {
+      return res.status(404).json({ success: false, error: 'Audit not found' });
+    }
+
+    const oldStart = auditData.startDate;
+    const oldDue = auditData.dueDate;
+
+    const timeline = Array.isArray(auditData.timeline) ? [...auditData.timeline] : [];
+    timeline.push({
+      event: 'Audit Timeline Rescheduled',
+      status: auditData.status || 'Scheduled',
+      timestamp: new Date().toISOString(),
+      actor: req.user?.name || req.user?.email || 'Admin',
+      notes: notes || `Audit timeline updated from ${formatDate(oldStart)} - ${formatDate(oldDue)} to ${formatDate(formattedStart)} - ${formatDate(formattedDue)} by Administrator.`
+    });
+
+    const updatePayload = {
+      startDate: formattedStart,
+      dueDate: formattedDue,
+      timeline,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (doc.exists) {
+      await auditRef.update(updatePayload);
+    }
+
+    // Update local cache and persist
+    exports.invalidateAuditsCache(targetAuditDocId, updatePayload);
+
+    // Send updated timeline notification email to auditor (and vendor)
+    const emailService = require('../services/emailService');
+    const auditorEmail = auditData.auditorEmail || (auditData.auditor && auditData.auditor.includes('@') ? auditData.auditor : null);
+    const vendorEmail = auditData.vendorEmail;
+
+    const emailParams = {
+      auditIdString: auditData.auditIdString || targetAuditDocId,
+      auditPeriod: auditData.auditPeriod || 'Current Period',
+      vendorName: auditData.vendorName || 'Vendor Partner',
+      customerName: auditData.customerName || auditData.organisation || 'Enterprise Client',
+      auditorName: auditData.auditorName || auditData.auditor || 'Auditor',
+      auditorEmail,
+      vendorEmail,
+      startDate: formatDate(formattedStart),
+      dueDate: formatDate(formattedDue),
+      establishmentType: auditData.establishmentType,
+      state: auditData.state
+    };
+
+    let emailSentToAuditor = false;
+    if (auditorEmail && auditorEmail.includes('@')) {
+      try {
+        await emailService.sendAuditorTimelineUpdatedEmail(emailParams);
+        emailSentToAuditor = true;
+      } catch (err) {
+        console.warn('[updateAuditTimeline]: Error sending email to auditor:', err.message);
+      }
+    }
+
+    // Also notify vendor of the updated timeline
+    if (vendorEmail && vendorEmail.includes('@')) {
+      try {
+        await emailService.sendVendorTimelineUpdatedEmail(emailParams);
+      } catch (err) {
+        console.warn('[updateAuditTimeline]: Error sending email to vendor:', err.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Audit timeline updated to ${formatDate(formattedStart)} - ${formatDate(formattedDue)} successfully`,
+      data: {
+        id: targetAuditDocId,
+        startDate: formattedStart,
+        dueDate: formattedDue,
+        emailSentToAuditor
+      }
+    });
+  } catch (error) {
+    console.error('updateAuditTimeline error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error: ' + error.message });
   }
 };
 

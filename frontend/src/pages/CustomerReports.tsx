@@ -4,11 +4,11 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { 
   LayoutDashboard, Building2, FileCheck, Clock, 
   BarChart3, Bell, Search, Filter, Eye, Download,
-  AlertCircle, Shield, FileText, CheckCircle2, AlertTriangle, X, Presentation, FileBarChart, Scale
+  AlertCircle, Shield, FileText, CheckCircle2, AlertTriangle, X, Presentation, FileBarChart, Scale, Paperclip
 } from 'lucide-react';
 import { getCustomerReports } from '../services/api';
 import api from '../services/api';
-import { findActRule, getDisplayLaw } from '../utils/actLawMatcher';
+import { findActRule, getDisplayLaw, handleLawButtonClick, downloadActRuleAttachment } from '../utils/actLawMatcher';
 
 export const CustomerReports: React.FC = () => {
   const navigate = useNavigate();
@@ -45,8 +45,21 @@ export const CustomerReports: React.FC = () => {
   ];
 
   const getActLaw = (catOrItem: any, reportObj: any) => {
-    const actRules: any[] = (reportObj?.actRules && reportObj.actRules.length > 0) ? reportObj.actRules : fallbackActRules;
-    return findActRule(catOrItem, actRules);
+    const raw = findActRule(catOrItem, reportObj?.actRules);
+    if (!raw && fallbackActRules.length > 0) {
+      return findActRule(catOrItem, fallbackActRules);
+    }
+    if (raw && fallbackActRules.length > 0) {
+      const live = findActRule(catOrItem, fallbackActRules);
+      if (live) {
+        return {
+          ...raw,
+          attachment: live.attachment || raw.attachment,
+          description: (live.description && live.description.trim()) ? live.description : raw.description
+        };
+      }
+    }
+    return raw;
   };
 
   const fetchReports = async () => {
@@ -539,6 +552,7 @@ export const CustomerReports: React.FC = () => {
                     {selectedReport.categoryScores.map((cs: any, idx: number) => {
                       const matchedLaw = getActLaw(cs, selectedReport);
                       const lawDescription = (matchedLaw?.description || '').trim();
+                      const hasLawRule = Boolean(lawDescription || matchedLaw?.attachment?.fileData);
 
                       return (
                         <div key={idx} style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -546,12 +560,18 @@ export const CustomerReports: React.FC = () => {
                             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0B1F3A' }}>{cs.category}</span>
                             <button
                               type="button"
-                              className={`badge-law-btn ${lawDescription ? 'has-rule' : ''} no-print`}
+                              className={`badge-law-btn ${hasLawRule ? 'has-rule' : ''} no-print`}
                               onClick={() => {
-                                const lawToDisplay = getDisplayLaw(cs, matchedLaw);
-                                setActiveLawModal({ item: cs, law: lawToDisplay });
+                                handleLawButtonClick(matchedLaw, () => {
+                                  const lawToDisplay = getDisplayLaw(cs, matchedLaw);
+                                  setActiveLawModal({ item: cs, law: lawToDisplay });
+                                });
                               }}
-                              title={`View Law & Statutory Rule for ${matchedLaw?.shortName || cs.category}`}
+                              title={
+                                !lawDescription && matchedLaw?.attachment?.fileData
+                                  ? `Download Attached Rule Document for ${matchedLaw?.shortName || cs.category}`
+                                  : `View Law & Statutory Rule for ${matchedLaw?.shortName || cs.category}`
+                              }
                             >
                               <Scale className="w-3 h-3 mr-1 inline-block" />
                               <span>Law</span>
@@ -674,6 +694,33 @@ export const CustomerReports: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {Boolean(activeLawModal.law?.attachment && (activeLawModal.law.attachment.fileData || (activeLawModal.law.attachment as any).fileUrl)) && (
+                <div style={{
+                  marginTop: '0.875rem', padding: '0.75rem 1rem', background: '#F0FDF4',
+                  border: '1px solid #BBF7D0', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                    <Paperclip className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {activeLawModal.law.attachment.fileName || 'Attached Statutory Rule Document'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => downloadActRuleAttachment(activeLawModal.law.attachment)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.35rem 0.75rem', borderRadius: '6px',
+                      background: '#059669', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700,
+                      border: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download
+                  </button>
+                </div>
+              )}
 
               {activeLawModal.law?.states && activeLawModal.law.states.length > 0 && (
                 <div className="law-modal-states">

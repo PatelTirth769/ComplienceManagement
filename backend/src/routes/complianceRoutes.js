@@ -5,6 +5,9 @@ const complianceController = require('../controllers/complianceController');
 // Vendor Types
 router.get('/vendor-types', complianceController.getVendorTypes);
 
+// Vendors List for Auditor & Interview modules
+router.get('/vendors', complianceController.getVendors);
+
 // Templates / Checklists
 router.get('/templates/other-vendor', (req, res, next) => {
   req.params.vendorType = 'other-vendor';

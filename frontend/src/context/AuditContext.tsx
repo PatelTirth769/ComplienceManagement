@@ -44,7 +44,7 @@ interface AuditContextType {
   setIsReadOnly: (readOnly: boolean) => void;
   initiateReAuditAction: () => Promise<boolean>;
   loadAuditRecord: (audit: any) => Promise<boolean>;
-  
+
   // Filters
   searchTerm: string;
   categoryFilter: string;
@@ -75,7 +75,7 @@ interface AuditContextType {
     pending: number;
     percentComplete: number;
   };
-  
+
   // Dynamic categories extracted from checklist
   categories: string[];
 }
@@ -108,7 +108,35 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [savedAudit, setSavedAudit] = useState<AuditRecord | null>(null);
   const [actRules, setActRules] = useState<ActRule[]>([]);
+  const liveRulesRef = React.useRef<ActRule[]>([]);
   const [interviewResources, setInterviewResources] = useState<InterviewResource[]>([]);
+
+  // Helper to merge audit actRules with latest live rules/attachments
+  const mergeWithLiveRules = (baseRules: ActRule[], liveRules: ActRule[]): ActRule[] => {
+    if (!liveRules || liveRules.length === 0) return baseRules || [];
+    if (!baseRules || baseRules.length === 0) return liveRules;
+
+    const liveMap = new Map<string, ActRule>();
+    liveRules.forEach(r => {
+      if (r.id) liveMap.set(r.id.toLowerCase(), r);
+      if (r.shortName) liveMap.set(r.shortName.toLowerCase(), r);
+    });
+
+    return baseRules.map(r => {
+      const live = liveMap.get((r.id || '').toLowerCase()) || liveMap.get((r.shortName || '').toLowerCase());
+      if (live) {
+        return {
+          ...r,
+          attachment: live.attachment || r.attachment || null,
+          description: (live.description && live.description.trim()) ? live.description : (r.description || ''),
+          actName: live.actName || r.actName,
+          category: live.category || r.category,
+          states: (live.states && live.states.length > 0) ? live.states : r.states,
+        };
+      }
+      return r;
+    });
+  };
 
   // Re-Audit and active workflow state
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
@@ -153,7 +181,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (isMounted) {
           setError(
             err?.response?.data?.error?.message ||
-              `Unable to load vendor types from backend. Please verify backend is running at ${API_BASE_URL}`
+            `Unable to load vendor types from backend. Please verify backend is running at ${API_BASE_URL}`
           );
         }
       } finally {
@@ -164,7 +192,8 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     getActRules().then(res => {
       if (isMounted && res.success && Array.isArray(res.rules)) {
-        setActRules(res.rules);
+        liveRulesRef.current = res.rules;
+        setActRules(prev => mergeWithLiveRules(prev, res.rules));
       }
     }).catch(console.warn);
 
@@ -199,7 +228,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (isMounted) {
           setError(
             err?.response?.data?.error?.message ||
-              `Unable to load checklist template for '${selectedVendorType}'. Please check backend connection.`
+            `Unable to load checklist template for '${selectedVendorType}'. Please check backend connection.`
           );
         }
       } finally {
@@ -243,13 +272,29 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (isReadOnly || calculationResult || savedAudit) {
       return;
     }
-    setResponses(prev => ({
-      ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        status
+    setResponses(prev => {
+      const current = prev[itemId] || { status: '', remarks: '' };
+      let newRemarks = current.remarks || '';
+
+      if (status === 'COMPLIANT') {
+        // Automatically populate "Compliant" when Compliant is selected
+        newRemarks = 'Compliant';
+      } else if (status === 'NON_COMPLIANT' || status === 'NA') {
+        // Clear auto-filled "Compliant" (or legacy "Okay") so auditor is required to type a mandatory remark for non-compliant
+        if (newRemarks === 'Compliant' || newRemarks === 'Okay') {
+          newRemarks = '';
+        }
       }
-    }));
+
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          status,
+          remarks: newRemarks
+        }
+      };
+    });
 
     setValidationErrors(prev => {
       const next = { ...prev };
@@ -426,7 +471,52 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
 
       const result = await calculateCompliance(payload);
+      if (result && Array.isArray(result.nonCompliantItems)) {
+        const existingNonComp = (savedAudit && Array.isArray(savedAudit.nonCompliantItems))
+          ? savedAudit.nonCompliantItems
+          : (calculationResult && Array.isArray(calculationResult.nonCompliantItems))
+            ? calculationResult.nonCompliantItems
+            : [];
+        if (existingNonComp.length > 0) {
+          const respMap = new Map();
+          existingNonComp.forEach((nc: any) => {
+            const key = nc.itemId || nc.id;
+            if (key && nc.vendorResponse) {
+              respMap.set(key, nc);
+            }
+          });
+
+          result.nonCompliantItems = result.nonCompliantItems.map((nc: any) => {
+            const key = nc.itemId || nc.id;
+            const prev = respMap.get(key);
+            if (prev) {
+              return {
+                ...nc,
+                vendorResponse: prev.vendorResponse,
+                respondedAt: prev.respondedAt,
+                actionPlan: prev.actionPlan,
+                status: prev.status
+              };
+            }
+            return nc;
+          });
+        }
+      }
       setCalculationResult(result);
+
+      // Save draft of responses and calculation in localStorage so it's preserved if user gets logged out before clicking save
+      try {
+        const draftTargetId = activeAuditId || savedAudit?.id;
+        if (draftTargetId) {
+          localStorage.setItem(`compliance_draft_${draftTargetId}`, JSON.stringify({
+            responses,
+            calculationResult: result,
+            timestamp: Date.now()
+          }));
+        }
+      } catch (e) {
+        // ignore quota error
+      }
 
       setTimeout(() => {
         const resultsEl = document.getElementById('results-section');
@@ -495,6 +585,10 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           setActiveAuditId(res.data.id);
           try {
             localStorage.setItem('compliance_active_audit_id', res.data.id);
+            localStorage.removeItem(`compliance_draft_${res.data.id}`);
+            if (activeAuditId && activeAuditId !== res.data.id) {
+              localStorage.removeItem(`compliance_draft_${activeAuditId}`);
+            }
           } catch (e) {
             // ignore localStorage quota/access error
           }
@@ -582,23 +676,23 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setActiveAuditId(targetId);
       try {
         localStorage.setItem('compliance_active_audit_id', targetId);
-      } catch (e) {}
+      } catch (e) { }
 
       const isRe = audit.auditType === 'Re-Audit' || audit.auditType === 'Re Audit';
       setAuditType(isRe ? 'Re-Audit' : 'Original');
       setIsReadOnly(audit.isReadOnly === true);
       setIsReAuditInitiated(false);
 
-      // Restore snapshotted Act rules / laws for this audit
-      if (audit.actRules && Array.isArray(audit.actRules) && audit.actRules.length > 0) {
-        setActRules(audit.actRules);
-      } else {
-        getActRules().then(res => {
-          if (res.success && Array.isArray(res.rules)) {
-            setActRules(res.rules);
-          }
-        }).catch(console.warn);
-      }
+      // Restore snapshotted Act rules / laws for this audit and merge with latest live rules/attachments
+      const baseActRules = (audit.actRules && Array.isArray(audit.actRules) && audit.actRules.length > 0) ? audit.actRules : [];
+      setActRules(mergeWithLiveRules(baseActRules, liveRulesRef.current));
+
+      getActRules().then(res => {
+        if (res.success && Array.isArray(res.rules)) {
+          liveRulesRef.current = res.rules;
+          setActRules(prev => mergeWithLiveRules(prev, res.rules));
+        }
+      }).catch(console.warn);
 
       // Restore interview resources if present
       if (audit.interviewResources && Array.isArray(audit.interviewResources)) {
@@ -700,7 +794,36 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           ...audit
         });
       } else {
-        setCalculationResult(null);
+        // If not saved in backend yet, check if there is an in-progress draft (e.g. calculated score but forgot to save before logout)
+        let restoredFromDraft = false;
+        try {
+          const draftKey = `compliance_draft_${targetId}`;
+          const savedDraft = localStorage.getItem(draftKey);
+          if (savedDraft) {
+            const parsedDraft = JSON.parse(savedDraft);
+            if (parsedDraft.responses && typeof parsedDraft.responses === 'object') {
+              Object.entries(parsedDraft.responses).forEach(([itemId, val]: [string, any]) => {
+                if (restoredResp[itemId]) {
+                  restoredResp[itemId] = {
+                    status: typeof val === 'string' ? val : (val?.status || ''),
+                    remarks: val?.remarks || ''
+                  };
+                }
+              });
+              setResponses(restoredResp);
+            }
+            if (parsedDraft.calculationResult) {
+              setCalculationResult(parsedDraft.calculationResult);
+              restoredFromDraft = true;
+            }
+          }
+        } catch (e) {
+          // ignore draft parse error
+        }
+
+        if (!restoredFromDraft) {
+          setCalculationResult(null);
+        }
         setSavedAudit(null);
       }
 
@@ -721,7 +844,7 @@ export const AuditProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const resetAssessment = () => {
     try {
       localStorage.removeItem('compliance_active_audit_id');
-    } catch (e) {}
+    } catch (e) { }
     setAuditInfo(initialAuditInfo);
     setSelectedStateState('All');
     setSelectedCountryState('India');

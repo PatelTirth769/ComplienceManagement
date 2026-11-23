@@ -200,3 +200,48 @@ export function getDisplayLaw(catOrItem: any, matchedLaw: ActRule | null): ActRu
     formsCount: 0
   };
 }
+
+/**
+ * Downloads an attached Act rule file directly to the client machine.
+ */
+export function downloadActRuleAttachment(attachment: { fileName?: string; fileData?: string; fileUrl?: string } | null | undefined): boolean {
+  if (!attachment) return false;
+  const href = attachment.fileData || attachment.fileUrl;
+  if (!href) return false;
+  try {
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = attachment.fileName || 'Act_Rule_Attachment';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (err) {
+    console.error('Failed to download rule attachment:', err);
+    return false;
+  }
+}
+
+/**
+ * Handles clicking the Law button:
+ * - If admin wrote text in that box, opens the modal as it currently does.
+ * - If admin attached a file and did not write anything, direct file download is triggered.
+ * - If neither, opens modal to show default guidance.
+ */
+export function handleLawButtonClick(
+  matchedLaw: ActRule | null,
+  onOpenModal: () => void
+): void {
+  const hasDescription = Boolean(matchedLaw?.description && matchedLaw.description.trim().length > 0);
+  const att = matchedLaw?.attachment;
+  const hasAttachment = Boolean(att && (att.fileData || (att as any).fileUrl));
+
+  if (!hasDescription && hasAttachment) {
+    downloadActRuleAttachment(att);
+    return;
+  }
+
+  onOpenModal();
+}
+

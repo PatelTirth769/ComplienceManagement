@@ -4,9 +4,10 @@ import { getAdminSidebarItems } from '../utils/adminNavigation';
 import { 
   Scale, Search, Save, CheckCircle2, AlertCircle, 
   RotateCcw, BookOpen, Layers, ShieldCheck, Sparkles,
-  Check, FileText, Plus, X
+  Check, FileText, Plus, X, Paperclip, Download, Trash2
 } from 'lucide-react';
-import { getActRules, saveActRules, saveActRuleById, type ActRule } from '../services/api';
+import { getActRules, saveActRules, saveActRuleById, type ActRule, type ActRuleAttachment } from '../services/api';
+import { downloadActRuleAttachment } from '../utils/actLawMatcher';
 
 export const AdminRules: React.FC = () => {
   const sidebarItems = getAdminSidebarItems('Rules');
@@ -84,10 +85,52 @@ export const AdminRules: React.FC = () => {
     }
   };
 
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleFileSelect = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      showToast('File size exceeds 25MB limit', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const fileData = reader.result as string;
+      const attachment: ActRuleAttachment = {
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        fileData,
+        uploadedAt: new Date().toISOString()
+      };
+
+      setRules(prev => prev.map(r => r.id === id ? { ...r, attachment } : r));
+      setHasUnsavedChanges(true);
+      showToast(`Attached "${file.name}". Click "Save Rule" to save.`);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setRules(prev => prev.map(r => r.id === id ? { ...r, attachment: null } : r));
+    setHasUnsavedChanges(true);
+    showToast('Attachment removed. Click "Save Rule" to persist changes.');
+  };
+
   const handleSaveSingle = async (rule: ActRule) => {
     try {
       setSavingId(rule.id);
-      const res = await saveActRuleById(rule.id, rule.description || '');
+      const res = await saveActRuleById(rule.id, rule.description || '', rule.attachment);
       if (res.success) {
         setSavedRowId(rule.id);
         setTimeout(() => setSavedRowId(null), 2500);
@@ -150,7 +193,7 @@ export const AdminRules: React.FC = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const configuredCount = rules.filter(r => (r.description || '').trim().length > 0).length;
+  const configuredCount = rules.filter(r => (r.description || '').trim().length > 0 || Boolean(r.attachment?.fileData)).length;
   const pendingCount = rules.length - configuredCount;
 
   return (
@@ -444,7 +487,7 @@ export const AdminRules: React.FC = () => {
 
             {/* List of Acts */}
             {filteredRules.map((rule, idx) => {
-              const isDefined = (rule.description || '').trim().length > 0;
+              const isDefined = (rule.description || '').trim().length > 0 || Boolean(rule.attachment?.fileData);
               const isRowSaving = savingId === rule.id;
               const isRowJustSaved = savedRowId === rule.id;
 
@@ -537,6 +580,119 @@ export const AdminRules: React.FC = () => {
                           onChange={(e) => handleDescriptionChange(rule.id, e.target.value)}
                           placeholder={`Write the statutory rule, provisions, filing frequency, and mandatory compliance requirements for ${rule.actName}...`}
                         />
+
+                        {/* Hidden file input for attaching document */}
+                        <input
+                          id={`act-rule-file-${rule.id}`}
+                          type="file"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleFileSelect(rule.id, e)}
+                        />
+
+                        {/* Attachment button or attached file preview just below Rule Description box */}
+                        {rule.attachment && rule.attachment.fileData ? (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.5rem',
+                            marginTop: '0.5rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '8px',
+                            background: '#F0FDF4',
+                            border: '1px solid #BBF7D0'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                              <Paperclip size={15} color="#059669" style={{ flexShrink: 0 }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }} title={rule.attachment.fileName}>
+                                  {rule.attachment.fileName}
+                                </span>
+                                {rule.attachment.fileSize ? (
+                                  <span style={{ fontSize: '0.65rem', color: '#059669' }}>
+                                    {formatFileSize(rule.attachment.fileSize)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => downloadActRuleAttachment(rule.attachment)}
+                                title="Download Attached File"
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                  padding: '0.2rem 0.5rem', borderRadius: '5px',
+                                  background: '#DCFCE7', border: '1px solid #86EFAC',
+                                  color: '#166534', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer'
+                                }}
+                              >
+                                <Download size={12} /> Download
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById(`act-rule-file-${rule.id}`)?.click()}
+                                title="Change Attached File"
+                                style={{
+                                  padding: '0.2rem 0.5rem', borderRadius: '5px',
+                                  background: '#FFFFFF', border: '1px solid #CBD5E1',
+                                  color: '#475569', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer'
+                                }}
+                              >
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAttachment(rule.id)}
+                                title="Remove Attachment"
+                                style={{
+                                  padding: '0.2rem 0.4rem', borderRadius: '5px',
+                                  background: '#FEE2E2', border: '1px solid #FECACA',
+                                  color: '#DC2626', fontSize: '0.7rem', cursor: 'pointer'
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => document.getElementById(`act-rule-file-${rule.id}`)?.click()}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '7px',
+                                border: '1px dashed #94A3B8',
+                                background: '#F8FAFC',
+                                color: '#475569',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#1565C0';
+                                e.currentTarget.style.color = '#1565C0';
+                                e.currentTarget.style.background = '#EFF6FF';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = '#94A3B8';
+                                e.currentTarget.style.color = '#475569';
+                                e.currentTarget.style.background = '#F8FAFC';
+                              }}
+                              title="Attach PDF, Image, Excel, or reference document for this Act"
+                            >
+                              <Paperclip size={13} />
+                              <span>Attach File (PDF, Image, Excel)</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Row Save Button & Timestamp */}
